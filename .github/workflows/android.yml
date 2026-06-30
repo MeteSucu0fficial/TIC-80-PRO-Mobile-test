@@ -13,21 +13,41 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build with CMake
+      - name: Fix CMake Path and Inject Flags Safely
+        run: |
+          python3 -c "
+          import os, re
+          content = open('android/app/build.gradle').read()
+          workspace = os.environ.get('GITHUB_WORKSPACE', '')
+          
+          # 1. Sadece dosya yolunu düzeltiyoruz (Senin çalışan kısmın)
+          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
+          
+          # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz (Senin güvenli yöntem itirazsız çalışıyor)
+          # İçine tüm editör açma ve oynatıcı kapatma bayraklarını virgülle ayırarak gömdük.
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
+          
+          open('android/app/build.gradle', 'w').write(content)
+          "
+          
+          echo "---- Dosyanın Son Hali (Kontrol) ----"
+          tail -n 15 android/app/build.gradle
+
+      - name: Prepare Assets
         run: |
           mkdir -p build/assets
-          mkdir -p build/linux
-          cp tic80.desktop.in build/linux/
-          cp -r assets/* build/assets/
-          cd build
-          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
-          make
-          
-      - name: Upload Build Artifacts
+          cp -r assets/* build/assets/ || true
+          mkdir -p android/app/build/assets
+          cp -r assets/* android/app/build/assets/ || true
+
+      - name: Build APK (Gradle)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Full-Build
-          path: |
-            build/bin/
-            build/lib/
-            build/*.so
+          name: TIC80-Pro-Editor-APK
+          path: '**/*.apk'
