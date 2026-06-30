@@ -17,10 +17,9 @@ jobs:
         run: |
           # 1. CMakeLists.txt dosyasının tam yerini bul
           CMAKE_PATH=$(find $GITHUB_WORKSPACE -name "CMakeLists.txt" | head -n 1)
-          echo "CMake found at: $CMAKE_PATH"
+          echo "CMake bulundu: $CMAKE_PATH"
           
-          # 2. build.gradle dosyasını güncelle
-          # Path'i düzeltiyor ve CMAKE argümanlarını mevcut bloğa ekliyor
+          # 2. build.gradle dosyasını nokta atışı güncelle
           python3 -c "
           import re
           path = '$CMAKE_PATH'
@@ -29,15 +28,13 @@ jobs:
           with open(gradle_file, 'r') as f:
               content = f.read()
           
-          # Path'i düzelt
+          # A) Sadece 'path' içeren satırı bul ve düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{path}\"', content)
           
-          # CMake argümanlarını ekle/güncelle
-          cmake_args = 'arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"'
-          
-          if 'externalNativeBuild' in content:
-              # Mevcut bloğun içine ekle
-              content = re.sub(r'cmake\s*\{', f'cmake {{\n                {cmake_args}', content)
+          # B) Sadece 'arguments' içeren satırı bul ve bayraklarımızla değiştir
+          # Bu yöntem blokları bozmaz, sadece argümanları yeniler!
+          yeni_argumanlar = 'arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"'
+          content = re.sub(r'arguments\s+.*', yeni_argumanlar, content)
           
           with open(gradle_file, 'w') as f:
               f.write(content)
