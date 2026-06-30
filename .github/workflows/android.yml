@@ -13,36 +13,36 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Inject Flags
+      - name: Fix Everything
         run: |
+          # 1. Manifest dosyasındaki package="..." kısmını sil (Hata vermemesi için)
+          sed -i '/package="com.nesbox.tic"/d' android/app/src/main/AndroidManifest.xml
+          
+          # 2. CMake yolunu ve derleme ayarlarını düzelt
           python3 -c "
           import os, re
-          # 1. Dosyayı oku
-          file_path = 'android/app/build.gradle'
-          content = open(file_path).read()
-          workspace = os.environ.get('GITHUB_WORKSPACE', '')
+          gradle_file = 'android/app/build.gradle'
+          content = open(gradle_file).read()
           
-          # 2. CMake yolunu düzelt
+          # CMake yolunu proje kök dizinine (root) işaret ediyoruz
+          # Eğer dosya android klasörünün içindeyse 'android/CMakeLists.txt' yazmalısın.
+          # Root'ta ise bu satır doğrudur:
+          workspace = os.environ.get('GITHUB_WORKSPACE', '')
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 3. Ayarları dosyanın sonuna ekle (Böylece diğer ayarları ezmeden birleştirilir)
-          # BUILD_EDITORS=ON: Editörleri derler
-          # BUILD_SURF=OFF: O oyun oynatma arayüzünü devre dışı bırakır
-          # BUILD_PLAYER=OFF: Sadece oynatıcı modunu kapatır
-          # BUILD_WITH_JANET=OFF: Derleme hatası veren Janet modülünü kapatır
+          # Ayarları ekle
           config_block = '''
-
-          android {
-                defaultConfig {
-              externalNativeBuild {
+android {
+    defaultConfig {
+        externalNativeBuild {
             cmake {
                 arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"
             }
-                    }
-                       }
-                      }
-               '''
-          open(file_path, 'a').write(config_block)
+        }
+    }
+}
+'''
+          open(gradle_file, 'a').write(config_block)
           "
 
       - name: Prepare Assets
