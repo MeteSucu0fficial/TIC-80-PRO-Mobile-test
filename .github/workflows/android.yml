@@ -25,7 +25,7 @@ jobs:
           
           # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz (Senin güvenli yöntem itirazsız çalışıyor)
           # İçine tüm editör açma ve oynatıcı kapatma bayraklarını virgülle ayırarak gömdük.
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=ON\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
