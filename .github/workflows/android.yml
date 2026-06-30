@@ -13,22 +13,36 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build with CMake
+      - name: Inject Pro Flag into Gradle
         run: |
+          # Gradle'ın kendi CMake çağrısına -DBUILD_PRO=ON bayrağını otomatik ekliyoruz
+          python3 -c "
+          content = open('android/app/build.gradle').read()
+          if 'arguments' not in content:
+              content = content.replace('cmake {', 'cmake {\n                arguments \"-DBUILD_PRO=ON\"')
+          open('android/app/build.gradle', 'w').write(content)
+          "
+
+          # Kodun enjekte edilip edilmediğini loglarda görelim
+          cat android/app/build.gradle | grep -A 5 "cmake {"
+
+      - name: Prepare Assets
+        run: |
+          # CMake hem ana dizinde hem android içinde arayabilir, garantiye alalım
           mkdir -p build/assets
           cp -r assets/* build/assets/
-          cd build
-          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
-          make
+          mkdir -p android/app/build/assets
+          cp -r assets/* android/app/build/assets/
 
       - name: Build APK (Gradle)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          # --stacktrace sayesinde eğer hata verirse nedenini satır satır göreceğiz
+          ./gradlew assembleDebug --stacktrace
 
       - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
         with:
           name: TIC80-Pro-APK
-          path: '**/*.apk'  # Bu komut nerede olursa olsun tüm APK'ları bulup çıkarır!
+          path: '**/*.apk'
