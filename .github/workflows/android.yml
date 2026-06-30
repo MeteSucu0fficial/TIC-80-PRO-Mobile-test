@@ -13,26 +13,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Inject Pro Flag
+      - name: Fix CMake Path and Inject Flags
         run: |
           python3 -c "
           import os, re
           content = open('android/app/build.gradle').read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. CMake yolunu kesin olarak GitHub Actions kök dizinine sabitliyoruz
+          # 1. CMake yolunu GitHub Actions kök dizinine sabitliyoruz
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. PRO bayrağını ekliyoruz
-          if 'arguments' not in content:
-              content = content.replace('cmake {', 'cmake {\n                arguments \"-DBUILD_PRO=ON\"')
+          # 2. PRO bayrağını açıp, sorun çıkaran Janet motorunu kapatıyoruz
+          if '-DBUILD_PRO=ON' not in content:
+              content = content.replace('cmake {', 'cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_WITH_JANET=OFF\"')
           
           open('android/app/build.gradle', 'w').write(content)
           "
-          
-          # Yaptığımız değişikliği loglara yazdıralım ki görelim
-          echo "Güncellenmiş CMake yolları:"
-          cat android/app/build.gradle | grep "path "
+          # Yaptığımız değişikliği kontrol etmek için loglayalım
+          echo "Güncellenmiş Gradle Konfigürasyonu:"
+          cat android/app/build.gradle | grep -A 3 "cmake {"
 
       - name: Prepare Assets
         run: |
