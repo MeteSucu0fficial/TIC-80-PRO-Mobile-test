@@ -13,35 +13,29 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Patch Build Files
+      - name: Fix CMake Path and Inject Flags Safely
         run: |
-          # 1. CMakeLists.txt dosyasının tam yerini bul
-          CMAKE_PATH=$(find $GITHUB_WORKSPACE -name "CMakeLists.txt" | head -n 1)
-          echo "CMake bulundu: $CMAKE_PATH"
-          
-          # 2. build.gradle dosyasını nokta atışı güncelle
           python3 -c "
-          import re
-          path = '$CMAKE_PATH'
-          gradle_file = 'android/app/build.gradle'
+          import os, re
+          content = open('android/app/build.gradle').read()
+          workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          with open(gradle_file, 'r') as f:
-              content = f.read()
+          # 1. Sadece dosya yolunu düzeltiyoruz (Bu kısım zaten çalışıyordu)
+          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # A) Sadece 'path' içeren satırı bul ve düzelt
-          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{path}\"', content)
+          # 2. Dosyanın EN ALTINA yeni bir blok ekliyoruz. Gradle bunu yukarıdaki defaultConfig ile otomatik birleştirecek.
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
           
-          # B) Sadece 'arguments' içeren satırı bul ve bayraklarımızla değiştir
-          # Bu yöntem blokları bozmaz, sadece argümanları yeniler!
-          yeni_argumanlar = 'arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"'
-          content = re.sub(r'arguments\s+.*', yeni_argumanlar, content)
-          
-          with open(gradle_file, 'w') as f:
-              f.write(content)
+          open('android/app/build.gradle', 'w').write(content)
           "
+          
+          echo "---- Dosyanın Son Hali (Kontrol) ----"
+          tail -n 15 android/app/build.gradle
 
       - name: Prepare Assets
         run: |
+          mkdir -p build/assets
+          cp -r assets/* build/assets/ || true
           mkdir -p android/app/build/assets
           cp -r assets/* android/app/build/assets/ || true
 
@@ -49,10 +43,10 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Pro-Editor-APK
-          path: '**/app-debug.apk'
+          name: TIC80-Pro-APK
+          path: '**/*.apk'
