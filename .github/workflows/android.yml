@@ -13,25 +13,37 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Inject Flags Safely
+      - name: Fix CMake Path and Inject Flags
         run: |
           python3 -c "
           import os, re
-          content = open('android/app/build.gradle').read()
+          # 1. Dosyayı oku
+          file_path = 'android/app/build.gradle'
+          content = open(file_path).read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. Sadece dosya yolunu düzeltiyoruz (Bu kısım zaten çalışıyordu)
+          # 2. CMake yolunu düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. Dosyanın EN ALTINA yeni bir blok ekliyoruz. Gradle bunu yukarıdaki defaultConfig ile otomatik birleştirecek.
-          # 2. PRO bayrağını açıyoruz ve editörü zorla aktif ediyoruz
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITOR=ON\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
-          
-          open('android/app/build.gradle', 'w').write(content)
+          # 3. Ayarları dosyanın sonuna ekle (Böylece diğer ayarları ezmeden birleştirilir)
+          # BUILD_EDITORS=ON: Editörleri derler
+          # BUILD_SURF=OFF: O oyun oynatma arayüzünü devre dışı bırakır
+          # BUILD_PLAYER=OFF: Sadece oynatıcı modunu kapatır
+          # BUILD_WITH_JANET=OFF: Derleme hatası veren Janet modülünü kapatır
+          config_block = '''
+
+          android {
+                defaultConfig {
+              externalNativeBuild {
+            cmake {
+                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"
+            }
+                    }
+                       }
+                      }
+               '''
+          open(file_path, 'a').write(config_block)
           "
-          
-          echo "---- Dosyanın Son Hali (Kontrol) ----"
-          tail -n 15 android/app/build.gradle
 
       - name: Prepare Assets
         run: |
@@ -46,8 +58,8 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Find and Upload ANY APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Pro-APK
-          path: '**/*.apk'
+          name: TIC80-Pro-Editor-APK
+          path: '**/app-debug.apk'
