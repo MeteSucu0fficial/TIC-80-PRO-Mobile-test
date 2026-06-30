@@ -13,32 +13,38 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Inject Pro Flag into Gradle
+      - name: Fix CMake Path and Inject Pro Flag
         run: |
-          # Gradle'ın kendi CMake çağrısına -DBUILD_PRO=ON bayrağını otomatik ekliyoruz
           python3 -c "
+          import os, re
           content = open('android/app/build.gradle').read()
+          workspace = os.environ.get('GITHUB_WORKSPACE', '')
+          
+          # 1. CMake yolunu kesin olarak GitHub Actions kök dizinine sabitliyoruz
+          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
+          
+          # 2. PRO bayrağını ekliyoruz
           if 'arguments' not in content:
               content = content.replace('cmake {', 'cmake {\n                arguments \"-DBUILD_PRO=ON\"')
+          
           open('android/app/build.gradle', 'w').write(content)
           "
-
-          # Kodun enjekte edilip edilmediğini loglarda görelim
-          cat android/app/build.gradle | grep -A 5 "cmake {"
+          
+          # Yaptığımız değişikliği loglara yazdıralım ki görelim
+          echo "Güncellenmiş CMake yolları:"
+          cat android/app/build.gradle | grep "path "
 
       - name: Prepare Assets
         run: |
-          # CMake hem ana dizinde hem android içinde arayabilir, garantiye alalım
           mkdir -p build/assets
-          cp -r assets/* build/assets/
+          cp -r assets/* build/assets/ || true
           mkdir -p android/app/build/assets
-          cp -r assets/* android/app/build/assets/
+          cp -r assets/* android/app/build/assets/ || true
 
       - name: Build APK (Gradle)
         run: |
           cd android
           chmod +x gradlew
-          # --stacktrace sayesinde eğer hata verirse nedenini satır satır göreceğiz
           ./gradlew assembleDebug --stacktrace
 
       - name: Find and Upload ANY APK
