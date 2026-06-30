@@ -1,0 +1,397 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="src\lua">
+      <UniqueIdentifier>{338bdf98-6a02-4589-a373-c7bca25c746b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\yuescript">
+      <UniqueIdentifier>{af398a57-cb37-4862-a5e8-5ec539259611}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\efsw">
+      <UniqueIdentifier>{410f4895-3ea8-4a46-ac6a-0d4737da5cf1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\efsw\win">
+      <UniqueIdentifier>{4b765224-203c-4df9-ba95-c975f75c4cf1}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\3rdParty\lua\lapi.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lauxlib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lbaselib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lcode.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lcorolib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lctype.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ldblib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ldebug.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ldo.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ldump.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lfunc.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lgc.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\linit.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\liolib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\llex.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lmathlib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lmem.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\loadlib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lobject.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lopcodes.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\loslib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lparser.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lstate.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lstring.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lstrlib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ltable.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ltablib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\ltm.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lundump.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lutf8lib.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lvm.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\lua\lzio.c">
+      <Filter>src\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yuescript\ast.cpp">
+      <Filter>src\yuescript</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yuescript\parser.cpp">
+      <Filter>src\yuescript</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yuescript\yue_compiler.cpp">
+      <Filter>src\yuescript</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yuescript\yue_parser.cpp">
+      <Filter>src\yuescript</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yuescript\yuescript.cpp">
+      <Filter>src\yuescript</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yue.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\Debug.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\DirectorySnapshot.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\DirectorySnapshotDiff.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\DirWatcherGeneric.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileInfo.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileSystem.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileWatcher.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileWatcherCWrapper.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileWatcherGeneric.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileWatcherImpl.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\FileWatcherWin32.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\Log.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\Mutex.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\String.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\System.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\Thread.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\Watcher.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\WatcherGeneric.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\WatcherWin32.cpp">
+      <Filter>src\efsw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\platform\win\FileSystemImpl.cpp">
+      <Filter>src\efsw\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\platform\win\MutexImpl.cpp">
+      <Filter>src\efsw\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\platform\win\SystemImpl.cpp">
+      <Filter>src\efsw\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\3rdParty\efsw\platform\win\ThreadImpl.cpp">
+      <Filter>src\efsw\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\yuescript\yue_ast.cpp">
+      <Filter>src\yuescript</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\3rdParty\lua\lapi.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lauxlib.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lcode.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lctype.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\ldebug.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\ldo.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lfunc.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lgc.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\ljumptab.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\llex.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\llimits.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lmem.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lobject.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lopcodes.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lopnames.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lparser.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lprefix.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lstate.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lstring.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\ltable.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\ltm.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lua.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lua.hpp">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\luaconf.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lualib.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lundump.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lvm.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\lua\lzio.h">
+      <Filter>src\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\ast.hpp">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\parser.hpp">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\stacktraceplus.h">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\yue_ast.h">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\yue_compiler.h">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\yue_parser.h">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuescript\yuescript.h">
+      <Filter>src\yuescript</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\platform\win\FileSystemImpl.hpp">
+      <Filter>src\efsw\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\platform\win\MutexImpl.hpp">
+      <Filter>src\efsw\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\platform\win\SystemImpl.hpp">
+      <Filter>src\efsw\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\platform\win\ThreadImpl.hpp">
+      <Filter>src\efsw\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\efsw.h">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\sophist.h">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Atomic.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\base.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Debug.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\DirectorySnapshot.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\DirectorySnapshotDiff.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\DirWatcherGeneric.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\efsw.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\FileInfo.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\FileSystem.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\FileWatcherGeneric.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\FileWatcherImpl.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\FileWatcherWin32.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Lock.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Mutex.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\String.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\System.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Thread.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Utf.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\Watcher.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\WatcherGeneric.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rdParty\efsw\WatcherWin32.hpp">
+      <Filter>src\efsw</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

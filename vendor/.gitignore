@@ -1,0 +1,7 @@
+sdl2/CMakeFiles/
+sdl2/include/SDL_config.h
+sdl2/wayland-generated-protocols/
+sdl2/sdl2.pc
+zlib/CMakeFiles/
+zlib/zlib.pc
+
