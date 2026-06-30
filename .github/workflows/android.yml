@@ -26,7 +26,8 @@ jobs:
           # Derlemeye geç
           cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
-          make
+          - make
+          - make package # Bu komut, derlenen dosyaları APK veya paket haline getirir.
       - name: Upload APK/Library
         uses: actions/upload-artifact@v4
         with:
