@@ -13,26 +13,24 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Library (CMake)
+      - name: Build with CMake
         run: |
+          # 1. Klasör yapısını temiz ve doğru kur
+          rm -rf build
           mkdir -p build
+          
+          # 2. Assetlerin yerinde olduğundan emin ol ve kopyala
+          # Eğer ana dizinde 'assets' yoksa CMake hata vermeye devam eder.
+          # GitHub'da 'assets' klasörünün içine girip dosyaları gördüğünden emin ol.
+          mkdir -p build/assets
+          if [ -d "assets" ]; then
+            cp -r assets/* build/assets/
+          else
+            echo "UYARI: Assets klasoru bulunamadi!"
+            exit 1
+          fi
+          
+          # 3. CMake'i çalıştır
           cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
           make
-
-      - name: Build APK (Gradle)
-        run: |
-          # Eğer ana dizinde android klasörü varsa burası çalışır
-          if [ -d "android" ]; then
-            cd android
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          fi
-
-      - name: Upload Everything
-        uses: actions/upload-artifact@v4
-        with:
-          name: TIC80-Full-Build
-          path: |
-            build/
-            android/app/build/outputs/apk/
