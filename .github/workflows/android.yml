@@ -15,19 +15,17 @@ jobs:
 
       - name: Build with CMake
         run: |
-          # Klasörleri hazırla
           mkdir -p build/assets
           mkdir -p build/linux
           cp tic80.desktop.in build/linux/
-          
-          # Assets klasöründeki her şeyi build/assets içine kopyala
           cp -r assets/* build/assets/
-          
-          # Derlemeye geç
           cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
-          - make
-          - make package # Bu komut, derlenen dosyaları APK veya paket haline getirir.
+          make
+          # Eğer make package bir komutsa, bu şekilde olmalı. 
+          # Eğer hata verirse bu satırı silip sadece make ile devam et.
+          make package
+          
       - name: Upload APK/Library
         uses: actions/upload-artifact@v4
         with:
