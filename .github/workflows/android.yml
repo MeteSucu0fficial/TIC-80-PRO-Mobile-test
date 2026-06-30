@@ -8,7 +8,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          submodules: recursive  # Önemli kısım burası!
+          submodules: recursive
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -22,12 +22,12 @@ jobs:
           cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
           make
-          # Eğer make package bir komutsa, bu şekilde olmalı. 
-          # Eğer hata verirse bu satırı silip sadece make ile devam et.
-          make package
           
-      - name: Upload APK/Library
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Build-Output
-          path: build/  # Burası derlenen her şeyi paketleyip sana sunar
+          name: TIC80-Full-Build
+          path: |
+            build/bin/
+            build/lib/
+            build/*.so
