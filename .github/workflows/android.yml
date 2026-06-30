@@ -13,27 +13,52 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Inject Flags Safely
+      - name: Inject CMake Flags
         run: |
           python3 -c "
-          import os, re
-          content = open('android/app/build.gradle').read()
-          workspace = os.environ.get('GITHUB_WORKSPACE', '')
+          import os
+          # build.gradle dosyasını oku
+          with open('android/app/build.gradle', 'r') as f:
+              content = f.read()
           
-          # 1. Sadece dosya yolunu düzeltiyoruz (Bu kısım zaten çalışıyordu)
-          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
+          # CMake argümanlarını içeren bloğu, defaultConfig içerisine inject ediyoruz
+          # BUILD_EDITORS=ON olduğundan emin oluyoruz
+          cmake_block = '''
+          externalNativeBuild {
+              cmake {
+                  arguments '-DBUILD_PRO=ON', '-DBUILD_EDITORS=ON', '-DBUILD_WITH_JANET=OFF'
+                  cppFlags '-frtti -fexceptions'
+              }
+          }
+          '''
           
-          # 2. Dosyanın EN ALTINA yeni bir blok ekliyoruz. Gradle bunu yukarıdaki defaultConfig ile otomatik birleştirecek.
-          # 2. PRO bayrağını açıyoruz ve editörü zorla aktif ediyoruz
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITOR=ON\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
+          # defaultConfig bloğunun içine ekle
+          if 'defaultConfig {' in content:
+              content = content.replace('defaultConfig {', 'defaultConfig {' + cmake_block)
           
-          open('android/app/build.gradle', 'w').write(content)
+          with open('android/app/build.gradle', 'w') as f:
+              f.write(content)
           "
-          
-          echo "---- Dosyanın Son Hali (Kontrol) ----"
-          tail -n 15 android/app/build.gradle
 
       - name: Prepare Assets
+        run: |
+          mkdir -p build/assets
+          cp -r assets/* build/assets/ || true
+          mkdir -p android/app/build/assets
+          cp -r assets/* android/app/build/assets/ || true
+
+      - name: Build APK (Gradle)
+        run: |
+          cd android
+          chmod +x gradlew
+          # Önbelleği temizleyerek derle ki değişiklikler işlensin
+          ./gradlew clean assembleDebug --stacktrace
+
+      - name: Find and Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TIC80-Pro-APK
+          path: 'android/app/build/outputs/apk/debug/*.apk'
         run: |
           mkdir -p build/assets
           cp -r assets/* build/assets/ || true
