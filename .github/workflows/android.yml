@@ -5,25 +5,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        with: {submodules: recursive}
-      - uses: android-actions/setup-android@v3
-      
-      - name: Build Library and Package
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build with CMake
         run: |
-          mkdir -p build && cd build
+          # Önce build klasörünü oluştur
+          mkdir -p build
+          
+          # Assetleri build içine taşı
+          # Eğer ana dizinde 'assets' varsa, içindeki her şeyi build/assets içine kopyala
+          mkdir -p build/assets
+          cp -r assets/* build/assets/
+          
+          # Klasör kopyalandı mı kontrol et (Hata ayıklama için)
+          ls -la build/assets/
+          
+          # Şimdi derlemeye başla
+          cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
           make
-          # Eğer bir Android projesi kök dizinde varsa paketle:
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          fi
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: TIC80-Final-Package
-          path: |
-            build/bin/
-            **/build/outputs/apk/debug/*.apk
