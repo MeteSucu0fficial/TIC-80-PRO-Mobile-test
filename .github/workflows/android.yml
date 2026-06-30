@@ -17,7 +17,9 @@ jobs:
         run: |
           mkdir -p build/linux
           cp tic80.desktop.in build/linux/
-          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
+          # Şimdi ".." yerine dosyanın olduğu yeri (ana dizini) işaret ediyoruz.
+          # Eğer CMakeLists.txt ana dizindeyse, komutun sonundaki ".." kısmını "." ile değiştir.
+          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake .
           make
           
           mkdir build && cd build
