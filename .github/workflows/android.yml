@@ -13,42 +13,38 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix Everything
+      - name: Patch Build Files
         run: |
-          # 1. Manifest dosyasındaki package="..." kısmını sil (Hata vermemesi için)
-          sed -i '/package="com.nesbox.tic"/d' android/app/src/main/AndroidManifest.xml
+          # 1. CMakeLists.txt dosyasının tam yerini bul
+          CMAKE_PATH=$(find $GITHUB_WORKSPACE -name "CMakeLists.txt" | head -n 1)
+          echo "CMake found at: $CMAKE_PATH"
           
-          # 2. CMake yolunu ve derleme ayarlarını düzelt
+          # 2. build.gradle dosyasını güncelle
+          # Path'i düzeltiyor ve CMAKE argümanlarını mevcut bloğa ekliyor
           python3 -c "
-          import os, re
+          import re
+          path = '$CMAKE_PATH'
           gradle_file = 'android/app/build.gradle'
-          content = open(gradle_file).read()
           
-          # CMake yolunu proje kök dizinine (root) işaret ediyoruz
-          # Eğer dosya android klasörünün içindeyse 'android/CMakeLists.txt' yazmalısın.
-          # Root'ta ise bu satır doğrudur:
-          workspace = os.environ.get('GITHUB_WORKSPACE', '')
-          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
+          with open(gradle_file, 'r') as f:
+              content = f.read()
           
-          # Ayarları ekle
-          config_block = '''
-android {
-    defaultConfig {
-        externalNativeBuild {
-            cmake {
-                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"
-            }
-        }
-    }
-}
-'''
-          open(gradle_file, 'a').write(config_block)
+          # Path'i düzelt
+          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{path}\"', content)
+          
+          # CMake argümanlarını ekle/güncelle
+          cmake_args = 'arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"'
+          
+          if 'externalNativeBuild' in content:
+              # Mevcut bloğun içine ekle
+              content = re.sub(r'cmake\s*\{', f'cmake {{\n                {cmake_args}', content)
+          
+          with open(gradle_file, 'w') as f:
+              f.write(content)
           "
 
       - name: Prepare Assets
         run: |
-          mkdir -p build/assets
-          cp -r assets/* build/assets/ || true
           mkdir -p android/app/build/assets
           cp -r assets/* android/app/build/assets/ || true
 
@@ -56,7 +52,7 @@ android {
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
