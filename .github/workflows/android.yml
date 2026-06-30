@@ -13,21 +13,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build with CMake
+      - name: Build Library (CMake)
         run: |
-          mkdir -p build/assets
-          mkdir -p build/linux
-          cp tic80.desktop.in build/linux/
-          cp -r assets/* build/assets/
+          mkdir -p build
           cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
           make
-          
-      - name: Upload Build Artifacts
+
+      - name: Build APK (Gradle)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Full-Build
-          path: |
-            build/bin/
-            build/lib/
-            build/*.so
+          name: TIC80-Android-APK
+          path: android/app/build/outputs/apk/debug/*.apk
