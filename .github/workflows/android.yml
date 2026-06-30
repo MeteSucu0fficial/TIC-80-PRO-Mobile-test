@@ -15,8 +15,10 @@ jobs:
 
       - name: Build with CMake
         run: |
-          # Vendor klasörlerini zorla güncelle ve çek
-          git submodule update --init --recursive
+          mkdir -p build/linux
+          cp tic80.desktop.in build/linux/
+          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
+          make
           
           mkdir build && cd build
           cmake -DBUILD_PRO=ON -DANDROID=ON ..
