@@ -15,14 +15,24 @@ jobs:
 
       - name: Build Library (CMake)
         run: |
-          # Önce klasörü oluştur
-          mkdir -p build/assets
-          # Assetleri kopyala (Eğer assets klasörü kök dizinde duruyorsa)
-          if [ -d "assets" ]; then
-            cp -r assets/* build/assets/
-          fi
-          
+          mkdir -p build
           cd build
-          # CMake çalışırken assetleri görmesini sağlayacak şekilde konfigüre et
-          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DCORE_ASSETS=ON ..
+          cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
           make
+
+      - name: Build APK (Gradle)
+        run: |
+          # Eğer ana dizinde android klasörü varsa burası çalışır
+          if [ -d "android" ]; then
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          fi
+
+      - name: Upload Everything
+        uses: actions/upload-artifact@v4
+        with:
+          name: TIC80-Full-Build
+          path: |
+            build/
+            android/app/build/outputs/apk/
