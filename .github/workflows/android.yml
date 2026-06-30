@@ -15,18 +15,15 @@ jobs:
 
       - name: Build with CMake
         run: |
-          # 1. Ana dizinde temiz bir 'build' klasörü oluştur
-          mkdir -p build
+          # Klasörleri hazırla
+          mkdir -p build/assets
+          mkdir -p build/linux
+          cp tic80.desktop.in build/linux/
           
-          # 2. SDL2'nin kısıtlamasına takılmamak için derlemeyi 'build' klasörünün içinden yönet
+          # Assets klasöründeki her şeyi build/assets içine kopyala
+          cp -r assets/* build/assets/
+          
+          # Derlemeye geç
           cd build
-          
-          # 3. CMake'i ana dizine referans vererek çalıştır
           cmake -DBUILD_PRO=ON -DANDROID=ON -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
-          
-          # 4. Derle
-          make
-          
-          mkdir build && cd build
-          cmake -DBUILD_PRO=ON -DANDROID=ON ..
           make
