@@ -18,14 +18,14 @@ jobs:
           python3 -c "
           import os, re
           
-          # 1. lua.c içindeki eksik demoları temizle
+          # 1. lua.c icindeki eksik demolari temizle
           lua_path = 'src/api/lua.c'
           if os.path.exists(lua_path):
               content = open(lua_path).read()
               cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
               open(lua_path, 'w').write(cleaned)
               
-          # 2. SDL'in Android ana giriş sembolünü (SDL_main) player.c içine enjekte et
+          # 2. SDL'in Android ana giris sembolunu (SDL_main) player.c icine enjekte et
           player_path = 'src/system/sdl/player.c'
           if os.path.exists(player_path):
               content = open(player_path).read()
@@ -42,10 +42,8 @@ jobs:
           if os.path.exists(path):
               content = open(path).read()
               
-              # Hedefi kütüphaneye çevir
               content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
               
-              # CRITICAL FIX: Eski -fuse-ld=gold flag'lerini tamamen bertaraf etmek için LINK_FLAGS içine -fuse-ld=lld gömüyoruz
               linker_override = '''
               
               if(ANDROID)
@@ -57,7 +55,7 @@ jobs:
               endif()
               '''
               open(path, 'w').write(content + linker_override)
-              print('Modern LLD Linker kuralları mühürlendi!')
+              print('Modern LLD Linker kurallari muhurlendi!')
           "
 
       - name: Overwrite build.gradle to use Native CMake Compilation with Modern Linker
@@ -71,6 +69,7 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
+          # Gradle icindeki tum hatali yorum satirlari (//) formatina cevrildi veya tamamen silindi
           clean_gradle = f'''
           plugins {{
               id 'com.android.application'
@@ -93,7 +92,6 @@ jobs:
                   
                   externalNativeBuild {{
                       cmake {{
-                          # CRITICAL FIX: Gradle tarafında da derleyiciye lld kullanmasını emrediyoruz
                           arguments \"-DANDROID_STL=c++_shared\",
                                     \"-DANDROID_LD=lld\",
                                     \"-DBUILD_WITH_ALL=OFF\",
@@ -130,7 +128,7 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle LLD ayarlarıyla senkronize edildi!')
+          print('build.gradle tamamen sterilize edildi!')
           "
 
       - name: Inject AndroidX Properties & Specify NDK Path
