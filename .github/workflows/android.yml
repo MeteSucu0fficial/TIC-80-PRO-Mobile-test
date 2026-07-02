@@ -87,17 +87,17 @@ jobs:
           
           make -j$(nproc) player-sdl
           
+          # CRITICAL FIX: main altındaki o eksik olan kutsal klasörü biz oluşturuyoruz!
           TARGET_JNI_DIR="../android/app/src/main/jniLibs/arm64-v8a"
           mkdir -p "$TARGET_JNI_DIR"
           
-          # Üretilen ana .so dosyasını (libtic80.so) kopyala
+          # Derlenen .so kütüphanelerini doğrudan bu taze yuvaya kopyala
           find . -name "*.so" -exec cp {} "$TARGET_JNI_DIR/" \;
           
-          # İSİM GARANTİSİ: Aynı klasör içine iki ismi de kopyalıyoruz.
-          # Java kodu libplayer-sdl.so da arasa, libtic80.so da arasa çaresiz bulacak!
+          # Çift isim korumasını bu ana klasöre de mühürle
           cp "$TARGET_JNI_DIR/libtic80.so" "$TARGET_JNI_DIR/libplayer-sdl.so" || true
           
-          echo "Kütüphane varyasyonları jniLibs klasörüne mühürlendi:"
+          echo "Kütüphaneler manuel oluşturulan jniLibs klasörüne başarıyla yerleşti:"
           ls -la "$TARGET_JNI_DIR/"
 
       - name: Overwrite build.gradle dynamically from assets/name.txt
@@ -110,8 +110,6 @@ jobs:
               lines = open('assets/name.txt').read().splitlines()
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
-          
-          print(f'Uygulama Paket Kimliği Ayarlanıyor: {package_id}')
 
           clean_gradle = f'''
           plugins {{
@@ -135,6 +133,7 @@ jobs:
 
               sourceSets {{
                   main {{
+                      # Doğrudan oluşturduğumuz standart jniLibs klasörünü dinletiyoruz
                       jniLibs.srcDirs = ['src/main/jniLibs']
                   }}
               }}
@@ -152,6 +151,7 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
+          print('build.gradle taze jniLibs yoluyla senkronize edildi!')
           "
 
       - name: Inject AndroidX Properties Fix
@@ -176,6 +176,7 @@ jobs:
               content = content.replace('com.nesbox.tic.documents', f'{package_id}.documents')
               content = content.replace('com.nesbox.tic.fileprovider', f'{package_id}.fileprovider')
               open(manifest_path, 'w').write(content)
+              print('AndroidManifest sterilize edildi!')
           "
 
       - name: Prepare Assets
@@ -187,8 +188,8 @@ jobs:
         run: |
           if [ -f "assets/icon.png" ]; then
             RES_DIR="android/app/src/main/res"
-            rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml
-            rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml
+            rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml || true
+            rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml || true
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
               mkdir -p "$RES_DIR/$dir"
               cp assets/icon.png "$RES_DIR/$dir/ic_launcher.png"
