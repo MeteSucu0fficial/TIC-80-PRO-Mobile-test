@@ -34,7 +34,7 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
-      - name: Hard Rewrite player-sdl Target to SHARED in CMakeLists
+      - name: Hard Rewrite player-sdl Target & Force Linker Flags
         run: |
           python3 -c "
           import os
@@ -42,12 +42,22 @@ jobs:
           if os.path.exists(path):
               content = open(path).read()
               
-              # Orijinal add_executable(player-sdl ...) komutunu tamamen SHARED library olarak değiştiriyoruz
-              # CMake'in read-only TYPE hatası vermemesi için en temiz çözüm budur
+              # Hedefi kütüphaneye çevir
               content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
               
-              open(path, 'w').write(content)
-              print('player-sdl hedefi başarıyla SHARED library formatına kalıcı olarak dönüştürüldü!')
+              # Linker'ın 'main' sembolü aramasını engellemek için kuralları dosyanın sonuna gömüyoruz
+              linker_override = '''
+              
+              if(ANDROID)
+                  # Linker'a kesinlikle shared library ürettiğini ve giriş noktasının SDL_main olduğunu söylüyoruz
+                  set_target_properties(player-sdl PROPERTIES 
+                      LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main\"
+                      SUFFIX \".so\"
+                  )
+              endif()
+              '''
+              open(path, 'w').write(content + linker_override)
+              print('Linker kuralları player-sdl için başarıyla kilitlendi!')
           "
 
       - name: Pure Player C++ Build via CMake
@@ -76,11 +86,11 @@ jobs:
             -DBUILD_WITH_JANET=OFF \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
           
-          # Bağımlılıkları kontrol ederek sadece player-sdl'i (ve dolayısıyla SDL2'yi) derle
+          # Derlemeyi tetikle
           make -j$(nproc) player-sdl
           
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
-          # Üretilen tüm paylaşılan (.so) kütüphanelerini Gradle'a taşıyoruz
+          # Üretilen paylaşılan nesneleri (.so) jniLibs içine kopyala
           find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
           echo "Toplanan .so dosyaları:"
           ls -la ../android/app/src/main/jniLibs/arm64-v8a/
