@@ -45,7 +45,7 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-      - name: Wipe All Embedded Demo Carts and Fix Studio/Tools Includes
+      - name: Wipe All Embedded Demo Carts and Fix Main.c Dependencies
         run: |
           python3 -c "
           import os, re
@@ -58,15 +58,18 @@ jobs:
               open(lua_path, 'w').write(cleaned)
               print('Gömülü demolar lua.c içinden temizlendi!')
           
-          # 2. main.c içindeki editör/studio bağımlılıklarını pasif yap
+          # 2. main.c içindeki tüm editör/stüdyo bağımlılıklarını (studio, tools, fft) temizle
           main_path = 'src/system/sdl/main.c'
           if os.path.exists(main_path):
               content = open(main_path).read()
-              # Hem studio/system.h hem de tools.h satırlarını devre dışı bırakıyoruz
-              cleaned = content.replace('#include \"studio/system.h\"', '// #include \"studio/system.h\"')
-              cleaned = cleaned.replace('#include \"tools.h\"', '// #include \"tools.h\"')
-              open(main_path, 'w').write(cleaned)
-              print('main.c içindeki studio ve tools bağımlılıkları temizlendi!')
+              
+              # Sorun çıkaran tüm include satırlarını bulup yorum satırına çeviriyoruz
+              content = content.replace('#include \"studio/system.h\"', '// #include \"studio/system.h\"')
+              content = content.replace('#include \"tools.h\"', '// #include \"tools.h\"')
+              content = content.replace('#include \"ext/fft.h\"', '// #include \"ext/fft.h\"')
+              
+              open(main_path, 'w').write(content)
+              print('main.c içerisindeki stüdyo ve fft bağımlılıkları başarıyla temizlendi!')
           "
 
       - name: Prepare Assets
