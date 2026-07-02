@@ -34,30 +34,20 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
-      - name: Force Overwrite player-sdl to SHARED Library
+      - name: Hard Rewrite player-sdl Target to SHARED in CMakeLists
         run: |
           python3 -c "
           import os
           path = 'CMakeLists.txt'
           if os.path.exists(path):
-              # Dosyanın orijinal add_executable kısmını tamamen devre dışı bırakıp temiz bir SHARED kütüphane olarak enjekte ediyoruz
               content = open(path).read()
               
-              # player-sdl tanımını tamamen esnetip bir shared library haline getiren CMake komutunu dosyanın sonuna çakıyoruz
-              override_code = '''
-              
-              # Force Android Shared Library Build for player-sdl
-              if(ANDROID)
-                  set_target_properties(player-sdl PROPERTIES ENABLE_EXPORTS ON)
-                  # CMake'e bunun bir shared library olduğunu zorla dikte ediyoruz
-                  set_property(TARGET player-sdl PROPERTY TYPE SHARED)
-              endif()
-              '''
-              
-              # Alternatif olarak add_executable satırını doğrudan SHARED yapalım
+              # Orijinal add_executable(player-sdl ...) komutunu tamamen SHARED library olarak değiştiriyoruz
+              # CMake'in read-only TYPE hatası vermemesi için en temiz çözüm budur
               content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
-              open(path, 'w').write(content + override_code)
-              print('CMakeLists.txt Android için başarıyla manipüle edildi!')
+              
+              open(path, 'w').write(content)
+              print('player-sdl hedefi başarıyla SHARED library formatına kalıcı olarak dönüştürüldü!')
           "
 
       - name: Pure Player C++ Build via CMake
@@ -86,11 +76,11 @@ jobs:
             -DBUILD_WITH_JANET=OFF \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
           
-          # Sadece player-sdl hedefini derle, o zaten bağımlılık olarak SDL2'yi çekecek
+          # Bağımlılıkları kontrol ederek sadece player-sdl'i (ve dolayısıyla SDL2'yi) derle
           make -j$(nproc) player-sdl
           
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
-          # Derleme klasöründeki tüm üretilen .so dosyalarını (libplayer-sdl.so dahil) topla
+          # Üretilen tüm paylaşılan (.so) kütüphanelerini Gradle'a taşıyoruz
           find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
           echo "Toplanan .so dosyaları:"
           ls -la ../android/app/src/main/jniLibs/arm64-v8a/
