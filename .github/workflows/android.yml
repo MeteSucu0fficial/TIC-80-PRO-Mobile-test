@@ -45,7 +45,25 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-              - name: Wipe All Embedded Demo Carts and Fix Studio Includes
+      - name: Wipe All Embedded Demo Carts and Fix Studio Includes
+        run: |
+          python3 -c "
+          import os, re
+          
+          lua_path = 'src/api/lua.c'
+          if os.path.exists(lua_path):
+              content = open(lua_path).read()
+              cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
+              open(lua_path, 'w').write(cleaned)
+              print('Gömülü demolar lua.c içinden temizlendi!')
+          
+          main_path = 'src/system/sdl/main.c'
+          if os.path.exists(main_path):
+              content = open(main_path).read()
+              cleaned = content.replace('#include \"studio/system.h\"', '// #include \"studio/system.h\"')
+              open(main_path, 'w').write(cleaned)
+              print('main.c içindeki studio/system.h satırı pasif yapıldı!')
+          "
 
       - name: Prepare Assets
         run: |
