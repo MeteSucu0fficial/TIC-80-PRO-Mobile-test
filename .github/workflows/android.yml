@@ -10,7 +10,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Android SDK and NDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Wipe Embedded Carts and Inject Android Main Fix
@@ -18,14 +18,14 @@ jobs:
           python3 -c "
           import os, re
           
-          # 1. lua.c icindeki eksik demolari temizle
+          # 1. lua.c içindeki eksik varsayılan demoları temizle (Çökmeyi engeller)
           lua_path = 'src/api/lua.c'
           if os.path.exists(lua_path):
               content = open(lua_path).read()
               cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
               open(lua_path, 'w').write(cleaned)
               
-          # 2. SDL'in Android ana giris sembolunu (SDL_main) player.c icine enjekte et
+          # 2. SDL'in Android ana giriş sembolünü (SDL_main) player.c içine enjekte et
           player_path = 'src/system/sdl/player.c'
           if os.path.exists(player_path):
               content = open(player_path).read()
@@ -34,131 +34,26 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
-      - name: Hard Rewrite player-sdl Target & Force Library Output
+      - name: Fix CMake Path and Inject Player Flags Safely
         run: |
           python3 -c "
-          import os
-          path = 'CMakeLists.txt'
-          if os.path.exists(path):
-              content = open(path).read()
-              content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
-              
-              linker_override = '''
-              if(ANDROID)
-                  set_target_properties(player-sdl PROPERTIES 
-                      OUTPUT_NAME \"tic80\"
-                      LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main -fuse-ld=lld\"
-                      SUFFIX \".so\"
-                  )
-              endif()
-              '''
-              open(path, 'w').write(content + linker_override)
+          import os, re
+          content = open('android/app/build.gradle').read()
+          workspace = os.environ.get('GITHUB_WORKSPACE', '')
+          
+          # 1. Sadece dosya yolunu düzeltiyoruz (Senin çalışan kısmın)
+          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
+          
+          # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz (Senin çalışan yöntemin)
+          # KESİN OYUNCU AYARLARI: Editörler kapalı, sadece oyun oynatıcı aktif!
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
+          
+          open('android/app/build.gradle', 'w').write(content)
           "
+          echo "---- Dosyanın Son Hali (Kontrol) ----"
+          tail -n 15 android/app/build.gradle
 
-      - name: Hijack NDK Toolchain (Brute Force ld.gold to ld.lld)
-        run: |
-          # 1. Sistemdeki gerçek NDK yolunu saptıyoruz
-          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
-          TOOLCHAIN_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          
-          echo "Hedef Toolchain Klasörü: $TOOLCHAIN_BIN"
-          
-          # 2. NDK icindeki sorunlu ld.gold dosyasını uçuruyoruz
-          rm -f "$TOOLCHAIN_BIN/ld.gold"
-          rm -f "$TOOLCHAIN_BIN/aarch64-linux-android-ld.gold"
-          
-          # 3. ld.gold cagrildigi an aslında modern ld.lld calissin diye sembolik bag kuruyoruz
-          ln -s "$TOOLCHAIN_BIN/ld.lld" "$TOOLCHAIN_BIN/ld.gold"
-          ln -s "$TOOLCHAIN_BIN/ld.lld" "$TOOLCHAIN_BIN/aarch64-linux-android-ld.gold"
-          
-          # 4. Genel Linux /usr/bin altındaki gold linker'ı da etkisiz hale getiriyoruz
-          sudo rm -f /usr/bin/ld.gold
-          sudo ln -s /usr/bin/ld.lld /usr/bin/ld.gold || true
-          
-          echo "Linker korsanlığı tamamlandı! Artik sistem gold dese de lld calisacak."
-
-      - name: Overwrite build.gradle to use Native CMake Compilation
-        run: |
-          python3 -c "
-          import os
-          
-          package_id = 'com.nesbox.tic'
-          if os.path.exists('assets/name.txt'):
-              lines = open('assets/name.txt').read().splitlines()
-              if len(lines) >= 2 and lines[1].strip():
-                  package_id = lines[1].strip()
-
-          clean_gradle = f'''
-          plugins {{
-              id 'com.android.application'
-          }}
-
-          android {{
-              namespace 'com.nesbox.tic'
-              compileSdk 34
-              
-              if (project.hasProperty('forcedNdkVersion')) {{
-                  ndkVersion = project.property('forcedNdkVersion')
-              }}
-
-              defaultConfig {{
-                  applicationId '{package_id}'
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
-                  
-                  externalNativeBuild {{
-                      cmake {{
-                          arguments \"-DANDROID_STL=c++_shared\",
-                                    \"-DANDROID_LD=lld\",
-                                    \"-DBUILD_WITH_ALL=OFF\",
-                                    \"-DBUILD_PRO=OFF\",
-                                    \"-DBUILD_EDITORS=OFF\",
-                                    \"-DBUILD_SURF=OFF\",
-                                    \"-DBUILD_NET=OFF\",
-                                    \"-DBUILD_PLAYER=ON\",
-                                    \"-DBUILD_WITH_JANET=OFF\",
-                                    \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON\"
-                          abiFilters 'arm64-v8a'
-                          targets 'player-sdl'
-                      }}
-                  }}
-              }}
-
-              externalNativeBuild {{
-                  cmake {{
-                      path \"../../CMakeLists.txt\"
-                      version \"3.22.1\"
-                  }}
-              }}
-
-              buildTypes {{
-                  release {{
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }}
-              }}
-          }}
-
-          dependencies {{
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-          }}
-          '''
-          open('android/app/build.gradle', 'w').write(clean_gradle)
-          "
-
-      - name: Inject AndroidX Properties & Specify NDK Path
-        run: |
-          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
-          NDK_VER=$(basename "$NDK_PATH")
-          
-          echo "android.useAndroidX=true" > android/gradle.properties
-          echo "android.enableJetifier=true" >> android/gradle.properties
-          echo "forcedNdkVersion=$NDK_VER" >> android/gradle.properties
-          echo "ndk.dir=$NDK_PATH" > android/local.properties
-
-      - name: Fix AndroidManifest Package & Authorities
+      - name: Fix AndroidManifest Package ID from name.txt
         run: |
           python3 -c "
           import os, re
@@ -178,15 +73,19 @@ jobs:
               open(manifest_path, 'w').write(content)
           "
 
-      - name: Prepare Assets
+      - name: Inject Dynamic App Name from name.txt
         run: |
-          mkdir -p android/app/build/assets
-          cp -r assets/* android/app/build/assets/ || true
+          STRINGS_FILE="android/app/src/main/res/values/strings.xml"
+          if [ -f "assets/name.txt" ]; then
+            APP_NAME=$(head -n 1 assets/name.txt | tr -d '\n\r')
+            sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
+          fi
 
-      - name: Auto-Replace App Icon from Assets
+      - name: Inject Custom App Icon (icon.png)
         run: |
           if [ -f "assets/icon.png" ]; then
             RES_DIR="android/app/src/main/res"
+            # XML tabanlı eski ikonları temizle ki bizim PNG baskın gelsin
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml || true
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml || true
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
@@ -196,22 +95,32 @@ jobs:
             done
           fi
 
-      - name: Auto-Change App Name from Assets
+      - name: Prepare Assets & Inject Gömülü Oyun (cart.tic)
         run: |
-          STRINGS_FILE="android/app/src/main/res/values/strings.xml"
-          if [ -f "assets/name.txt" ]; then
-            APP_NAME=$(head -n 1 assets/name.txt | tr -d '\n\r')
-            sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
+          # 1. Klasörleri emniyete alıyoruz
+          mkdir -p build/assets
+          mkdir -p android/app/build/assets
+          
+          # 2. assets klasöründeki her şeyi kopyala
+          cp -r assets/* build/assets/ || true
+          cp -r assets/* android/app/build/assets/ || true
+          
+          # 3. KESİN ÇÖZÜM: Eğer assets içinde cart.tic varsa, bunu TIC-80'in Android'de
+          # otomatik açtığı dahili ana klasöre (assets/) 'cart.tic' adıyla gömüyoruz.
+          if [ -f "assets/cart.tic" ]; then
+            mkdir -p android/app/src/main/assets
+            cp assets/cart.tic android/app/src/main/assets/cart.tic
+            echo "Oyun (cart.tic) uygulamanın kalbine gömüldü!"
           fi
 
-      - name: Build APK (Full Native Compilation & Packaging)
+      - name: Build APK (Gradle)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Player-APK
+          name: TIC80-Custom-Player-APK
           path: '**/*.apk'
