@@ -30,7 +30,6 @@ jobs:
           if os.path.exists(player_path):
               content = open(player_path).read()
               if 'SDL_main' not in content:
-                  # Standart main fonksiyonunu SDL_main olarak değiştirerek Android uyumlu yapıyoruz
                   content = content.replace('int main(int argc, char** argv)', '#include \"SDL_main.h\"\nint SDL_main(int argc, char** argv)')
                   open(player_path, 'w').write(content)
           "
@@ -38,7 +37,7 @@ jobs:
       - name: Force Player-SDL to Shared Library for Android
         run: |
           python3 -c "
-          # player-sdl'in executable yerine .so üretmesi için CMake tanımını değiştiriyoruz
+          import os
           path = 'CMakeLists.txt'
           if os.path.exists(path):
               content = open(path).read()
@@ -57,7 +56,6 @@ jobs:
           
           mkdir -p build_android && cd build_android
           
-          # PRO kapalı, sadece PLAYER açık şekilde yalın kurulum
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a \
@@ -73,23 +71,20 @@ jobs:
             -DBUILD_WITH_JANET=OFF \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
           
-          # Sadece player-sdl ve SDL2 hedeflerini inşa et, stüdyo kütüphanelerini pas geç
           make -j$(nproc) player-sdl SDL2
           
-          # Çıkan tüm .so dosyalarını Gradle paketleme dizinine at
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
           find bin/ -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
           find lib/ -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
-          # Eğer player-sdl lib/ altında oluştuysa onu da jniLibs içine çek
           find . -name "libplayer-sdl.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
 
       - name: Strip Native Debugging Elements from build.gradle
         run: |
           python3 -c "
+          import os, re
           path = 'android/app/build.gradle'
           content = open(path).read()
           
-          import re
           content = re.sub(r'externalNativeBuild\s*\{.*?\}', '', content, flags=re.DOTALL)
           
           build_config = '''
