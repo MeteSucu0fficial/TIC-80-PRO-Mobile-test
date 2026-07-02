@@ -95,17 +95,18 @@ jobs:
       - name: Overwrite build.gradle to Absolute Clean State
         run: |
           python3 -c "
+          # Java sınıflarının R kaynağını bulabilmesi için paketi com.nesbox.tic (orijinal) olarak güncelledik
           clean_gradle = '''
           plugins {
               id 'com.android.application'
           }
 
           android {
-              namespace 'com.nesbox.tic80'
+              namespace 'com.nesbox.tic'
               compileSdk 34
 
               defaultConfig {
-                  applicationId 'com.nesbox.tic80'
+                  applicationId 'com.nesbox.tic'
                   minSdk 24
                   targetSdk 34
                   versionCode 1
@@ -134,7 +135,7 @@ jobs:
           }
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle sıfırdan pürüzsüz şekilde oluşturuldu!')
+          print('build.gradle paket uyumluluğu düzeltilerek yeniden oluşturuldu!')
           "
 
       - name: Inject AndroidX Properties Fix
@@ -149,7 +150,6 @@ jobs:
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               content = open(manifest_path).read()
-              # manifest tag'i içindeki eski package='...' tanımını tamamen uçuruyoruz
               cleaned = re.sub(r'package=\"[^\"]*\"', '', content)
               open(manifest_path, 'w').write(cleaned)
               print('AndroidManifest.xml içindeki eski package tanımı temizlendi!')
