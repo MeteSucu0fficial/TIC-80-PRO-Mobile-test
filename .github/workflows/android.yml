@@ -13,19 +13,37 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Inject Build Config, Fix Linker and CMake
+      - name: Hard-Fix Linker Overrides and Build Config
         run: |
           python3 -c "
           import os, re
+          
+          # 1. Projedeki tüm CMakeLists.txt'lerdeki '-fuse-ld=gold' dayatmalarını temizle/lld yap
+          def fix_cmake_files(dir_path):
+              for root, dirs, files in os.walk(dir_path):
+                  for file in files:
+                      if file == 'CMakeLists.txt' or file.endswith('.cmake'):
+                          f_path = os.path.join(root, file)
+                          try:
+                              content = open(f_path, 'r', encoding='utf-8', errors='ignore').read()
+                              if '-fuse-ld=gold' in content:
+                                  fixed = content.replace('-fuse-ld=gold', '-fuse-ld=lld')
+                                  open(f_path, 'w', encoding='utf-8').write(fixed)
+                                  print(f'Linker temizlendi: {f_path}')
+                          except Exception:
+                              pass
+          
+          fix_cmake_files('.')
+          
+          # 2. build.gradle ayarlarını yap ve lld'yi mutlak kıl
           path = 'android/app/build.gradle'
           content = open(path).read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # CMakeLists yolunu düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # Linker olarak hatalı gold yerine lld kullanılmasını zorunlu kılıyoruz
-          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON\", \"-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld\", \"-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld'
+          # CMAKE_LINKER'ı doğrudan zorlayarak lld yapıyoruz
+          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON\", \"-DCMAKE_LINKER=ld.lld\", \"-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld\", \"-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld'
           
           build_config = f'''
           android {{
