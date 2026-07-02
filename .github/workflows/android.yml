@@ -10,66 +10,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK and NDK
         uses: android-actions/setup-android@v3
-
-      - name: Dynamic Linker Hijack (Auto-Find NDK and Force LLD)
-        run: |
-          echo "Sistemdeki NDK dizini taranıyor ve linker'lar manipüle ediliyor..."
-          
-          # ANDROID_HOME altındaki tüm NDK klasörlerinde ld.gold dosyasını bul ve lld ile ez
-          # Eğer ANDROID_HOME boşsa /usr/local/lib/android/sdk dizinine bakar
-          SEARCH_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          
-          find "$SEARCH_PATH" -type f -name "ld.gold" 2>/dev/null | while read -r gold_path; do
-            dir_path=$(dirname "$gold_path")
-            echo "Hedef linker bulundu: $dir_path"
-            
-            cd "$dir_path"
-            # Fiziksel olarak gold'u lld ile değiştiriyoruz
-            mv ld.gold ld.gold.bak || true
-            cp ld.lld ld.gold || true
-            
-            # Olası mimari ön ekli sembolik linkleri de lld'ye yönlendir
-            if [ -f "aarch64-linux-android-ld.gold" ] || [ -L "aarch64-linux-android-ld.gold" ]; then
-              rm -f aarch64-linux-android-ld.gold
-              ln -sf ld.lld aarch64-linux-android-ld.gold || true
-            fi
-            echo "Bu dizindeki Gold linker başarıyla LLD ile değiştirildi!"
-          done
-
-      - name: Inject Build Config
-        run: |
-          python3 -c "
-          import os, re
-          path = 'android/app/build.gradle'
-          content = open(path).read()
-          workspace = os.environ.get('GITHUB_WORKSPACE', '')
-          
-          # CMakeLists yolunu senkronize et
-          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
-          
-          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
-          
-          build_config = f'''
-          android {{
-              defaultConfig {{
-                  ndk {{ abiFilters \"arm64-v8a\" }}
-                  externalNativeBuild {{
-                      cmake {{ arguments \"{args}\" }}
-                  }}
-              }}
-              buildTypes {{
-                  release {{
-                      minifyEnabled true
-                      shrinkResources true
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }}
-              }}
-          }}
-          '''
-          open(path, 'w').write(content + build_config)
-          "
 
       - name: Wipe All Embedded Demo Carts and Neutralize Main.c
         run: |
@@ -82,19 +24,74 @@ jobs:
               content = open(lua_path).read()
               cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
               open(lua_path, 'w').write(cleaned)
-              print('Gömülü demolar lua.c içinden temizlendi!')
           
-          # 2. main.c'yi hiçbir dış bağımlılığı olmayan sembolik bir koda çevir
+          # 2. main.c'yi sembolik bir koda çevir
           main_path = 'src/system/sdl/main.c'
           if os.path.exists(main_path):
-              dummy_c_code = '''
-              // Neutralized for saf player build
-              int tic80_main_dummy(void) {
-                  return 0;
+              open(main_path, 'w').write('int tic80_main_dummy(void) { return 0; }')
+          "
+
+      - name: Manual C++ Build via CMake (Independent from Gradle)
+        run: |
+          # NDK ve Toolchain yollarını kesinleştiriyoruz
+          NDK_PATH="${ANDROID_HOME}/ndk/23.2.8568313"
+          if [ ! -d "$NDK_PATH" ]; then
+            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
+          fi
+          
+          echo "Kullanılan NDK: $NDK_PATH"
+          
+          mkdir -p build_android && cd build_android
+          
+          # Standart Android Toolchain ile doğrudan LLD'yi zorlayarak derleme başlatıyoruz
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANDROID_LD=lld \
+            -DBUILD_WITH_ALL=OFF \
+            -DBUILD_PRO=ON \
+            -DBUILD_EDITORS=OFF \
+            -DBUILD_SURF=OFF \
+            -DBUILD_NET=OFF \
+            -DBUILD_PLAYER=ON \
+            -DBUILD_WITH_JANET=OFF \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+          
+          make -j$(nproc) tic80 player-sdl SDL2
+          
+          # Derlenen kütüphaneleri Gradle'ın paketleme dizinine kopyalıyoruz
+          mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
+          cp bin/*.so ../android/app/src/main/jniLibs/arm64-v8a/ || true
+          cp lib/*.a ../android/app/src/main/jniLibs/arm64-v8a/ || true
+
+      - name: Strip Native Debugging Elements from build.gradle
+        run: |
+          python3 -c "
+          path = 'android/app/build.gradle'
+          content = open(path).read()
+          
+          # Gradle'ın içeride otomatik C++ derleme tetiklemesini TAMAMEN siliyoruz
+          import re
+          content = re.sub(r'externalNativeBuild\s*\{.*?\}', '', content, flags=re.DOTALL)
+          
+          # Temiz defaultConfig ayarını ekle (Sadece jniLibs'i paketleyecek)
+          build_config = '''
+          android {
+              defaultConfig {
+                  ndk { abiFilters 'arm64-v8a' }
               }
-              '''
-              open(main_path, 'w').write(dummy_c_code)
-              print('main.c sıfır hata üretecek şekilde körleştirildi!')
+              buildTypes {
+                  release {
+                      minifyEnabled true
+                      shrinkResources true
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+              }
+          }
+          '''
+          open(path, 'w').write(content + build_config)
           "
 
       - name: Prepare Assets
@@ -105,7 +102,6 @@ jobs:
       - name: Auto-Replace App Icon from Assets
         run: |
           if [ -f "assets/icon.png" ]; then
-            echo "icon.png bulundu, uygulama ikonları değiştiriliyor..."
             RES_DIR="android/app/src/main/res"
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml
@@ -121,13 +117,10 @@ jobs:
           STRINGS_FILE="android/app/src/main/res/values/strings.xml"
           if [ -f "assets/name.txt" ]; then
             APP_NAME=$(cat assets/name.txt | tr -d '\n\r')
-            echo "Uygulama ismi '$APP_NAME' olarak değiştiriliyor..."
             sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
-          else
-            echo "assets/name.txt bulunamadı, varsayılan isim kalacak."
           fi
 
-      - name: Build APK (Gradle)
+      - name: Build APK (Packaging Only)
         run: |
           cd android
           chmod +x gradlew
