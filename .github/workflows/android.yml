@@ -25,8 +25,8 @@ jobs:
           # CMake yolunu düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # Editörsüz, sadece Player modunda yapılandırma ekle
-          args = '-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
+          # BUILD_WITH_ALL=OFF eklenerek çakışma giderildi
+          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
           
           build_config = f'''
           android {{
@@ -69,13 +69,10 @@ jobs:
 
       - name: Auto-Change App Name from Assets
         run: |
-          # Eğer assets içinde name.txt varsa, uygulamanın adını değiştir
           STRINGS_FILE="android/app/src/main/res/values/strings.xml"
           if [ -f "assets/name.txt" ]; then
             APP_NAME=$(cat assets/name.txt | tr -d '\n\r')
             echo "Uygulama ismi '$APP_NAME' olarak değiştiriliyor..."
-            
-            # strings.xml içindeki app_name değerini yeni isimle değiştirir
             sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
           else
             echo "assets/name.txt bulunamadı, varsayılan isim kalacak."
