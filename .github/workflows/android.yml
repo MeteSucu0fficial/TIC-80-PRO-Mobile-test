@@ -58,21 +58,20 @@ jobs:
               open(lua_path, 'w').write(cleaned)
               print('Gömülü demolar lua.c içinden temizlendi!')
           
-          # 2. main.c dosyasını saf player moduna zorla ve stüdyo include bağımlılıklarını engelle
+          # 2. main.c içindeki stüdyo bloklarını tamamen bypass et
           main_path = 'src/system/sdl/main.c'
           if os.path.exists(main_path):
               content = open(main_path).read()
               
-              # Gerekli temel kütüphanelerin yüklendiğinden emin olmak ve BUILD_EDITORS makrosunu ezmek için tepeye enjeksiyon yapıyoruz
-              injection = '#undef BUILD_EDITORS\n#include <stdbool.h>\n#include \"tic80.h\"\n'
-              
-              # Sorun çıkaran include satırlarını temizliyoruz
+              # main.c'nin en başına BUILD_EDITORS'ı tamamen kapatacak emri veriyoruz
+              # ve sorun çıkaran include satırlarını tamamen etkisiz hale getiriyoruz
+              content = content.replace('#if defined(BUILD_EDITORS)', '#if 0')
               content = content.replace('#include \"studio/system.h\"', '// #include \"studio/system.h\"')
               content = content.replace('#include \"tools.h\"', '// #include \"tools.h\"')
               content = content.replace('#include \"ext/fft.h\"', '// #include \"ext/fft.h\"')
               
-              open(main_path, 'w').write(injection + content)
-              print('main.c çevre değişkenleri ve tipleri düzeltildi!')
+              open(main_path, 'w').write(content)
+              print('main.c stüdyo blokları #if 0 ile bypass edildi!')
           "
 
       - name: Prepare Assets
