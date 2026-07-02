@@ -13,37 +13,41 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Hard-Fix Linker Overrides and Build Config
+      - name: Physical Linker Swap (Force LLD over Gold)
+        run: |
+          # NDK içindeki toolchain dizinine gidiyoruz
+          NDK_BIN_DIR="/usr/local/lib/android/sdk/ndk/23.2.8568313/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          
+          if [ -d "$NDK_BIN_DIR" ]; then
+            echo "NDK Toolchain dizini bulundu, fiziksel yer değiştirme yapılıyor..."
+            cd "$NDK_BIN_DIR"
+            
+            # Eski gold linker'ı yedekle
+            mv ld.gold ld.gold.bak || true
+            rm -f aarch64-linux-android-ld.gold || true
+            
+            # lld'yi gold ismiyle kopyala (Sistem ne isterse istesin lld çalışacak)
+            cp ld.lld ld.gold
+            ln -sf ld.lld aarch64-linux-android-ld.gold || true
+            
+            echo "Linker hilesi başarıyla uygulandı!"
+          else
+            echo "HATA: NDK dizini bulunamadı!"
+            exit 1
+          fi
+
+      - name: Inject Build Config
         run: |
           python3 -c "
           import os, re
-          
-          # 1. Projedeki tüm CMakeLists.txt'lerdeki '-fuse-ld=gold' dayatmalarını temizle/lld yap
-          def fix_cmake_files(dir_path):
-              for root, dirs, files in os.walk(dir_path):
-                  for file in files:
-                      if file == 'CMakeLists.txt' or file.endswith('.cmake'):
-                          f_path = os.path.join(root, file)
-                          try:
-                              content = open(f_path, 'r', encoding='utf-8', errors='ignore').read()
-                              if '-fuse-ld=gold' in content:
-                                  fixed = content.replace('-fuse-ld=gold', '-fuse-ld=lld')
-                                  open(f_path, 'w', encoding='utf-8').write(fixed)
-                                  print(f'Linker temizlendi: {f_path}')
-                          except Exception:
-                              pass
-          
-          fix_cmake_files('.')
-          
-          # 2. build.gradle ayarlarını yap ve lld'yi mutlak kıl
           path = 'android/app/build.gradle'
           content = open(path).read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
+          # CMakeLists yolunu senkronize et
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # CMAKE_LINKER'ı doğrudan zorlayarak lld yapıyoruz
-          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON\", \"-DCMAKE_LINKER=ld.lld\", \"-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld\", \"-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld'
+          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
           
           build_config = f'''
           android {{
