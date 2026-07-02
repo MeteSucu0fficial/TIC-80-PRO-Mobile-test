@@ -13,7 +13,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Inject Build Config and Fix CMake
+      - name: Inject Build Config, Fix Linker and CMake
         run: |
           python3 -c "
           import os, re
@@ -21,9 +21,11 @@ jobs:
           content = open(path).read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
+          # CMakeLists yolunu düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
+          # Linker olarak hatalı gold yerine lld kullanılmasını zorunlu kılıyoruz
+          args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON\", \"-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld\", \"-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld'
           
           build_config = f'''
           android {{
@@ -59,7 +61,6 @@ jobs:
               print('Gömülü demolar lua.c içinden temizlendi!')
           
           # 2. main.c'yi hiçbir dış bağımlılığı olmayan sembolik bir koda çevir
-          # Böylece derleyici hata vermeden bu hedefi geçecek, asıl işi player-sdl yapacak.
           main_path = 'src/system/sdl/main.c'
           if os.path.exists(main_path):
               dummy_c_code = '''
