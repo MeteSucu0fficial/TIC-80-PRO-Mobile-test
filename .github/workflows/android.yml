@@ -45,18 +45,7 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-      - name: Wipe All Embedded Demo Carts from Source
-        run: |
-          python3 -c "
-          import os, re
-          path = 'src/api/lua.c'
-          if os.path.exists(path):
-              content = open(path).read()
-              # build/assets klasöründen include edilmeye çalışılan tüm .dat satırlarını bulup yorum satırına çevirir
-              cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
-              open(path, 'w').write(cleaned)
-              print('Bütün gömülü demolar lua.c içinden başarıyla temizlendi!')
-          "
+              - name: Wipe All Embedded Demo Carts and Fix Studio Includes
 
       - name: Prepare Assets
         run: |
