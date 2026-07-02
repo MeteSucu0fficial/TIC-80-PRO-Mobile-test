@@ -34,14 +34,29 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
-      - name: Hard Rewrite player-sdl Target & Force Modern LLD Linker
+      - name: Eradicate -fuse-ld=gold and Force Modern LLD
         run: |
           python3 -c "
           import os
+          
+          # Repo icindeki tum CMakeLists.txt ve .cmake dosyalarinda '-fuse-ld=gold' arayip temizliyoruz
+          for root, dirs, files in os.walk('.'):
+              for file in files:
+                  if file.endswith('CMakeLists.txt') or file.endswith('.cmake'):
+                      f_path = os.path.join(root, file)
+                      try:
+                          content = open(f_path, 'r', encoding='utf-8', errors='ignore').read()
+                          if '-fuse-ld=gold' in content:
+                              print(f'Gold linker temizleniyor: {f_path}')
+                              content = content.replace('-fuse-ld=gold', '-fuse-ld=lld')
+                              open(f_path, 'w', encoding='utf-8').write(content)
+                      except Exception as e:
+                          pass
+
+          # Ana CMakeLists.txt dosyasini kütüphane moduna zorla geçiriyoruz
           path = 'CMakeLists.txt'
           if os.path.exists(path):
               content = open(path).read()
-              
               content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
               
               linker_override = '''
@@ -55,7 +70,6 @@ jobs:
               endif()
               '''
               open(path, 'w').write(content + linker_override)
-              print('Modern LLD Linker kurallari muhurlendi!')
           "
 
       - name: Overwrite build.gradle to use Native CMake Compilation with Modern Linker
@@ -69,7 +83,6 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
-          # Gradle icindeki tum hatali yorum satirlari (//) formatina cevrildi veya tamamen silindi
           clean_gradle = f'''
           plugins {{
               id 'com.android.application'
@@ -128,7 +141,6 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle tamamen sterilize edildi!')
           "
 
       - name: Inject AndroidX Properties & Specify NDK Path
