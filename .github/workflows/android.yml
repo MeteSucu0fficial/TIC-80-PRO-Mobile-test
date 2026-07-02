@@ -45,11 +45,12 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-      - name: Wipe All Embedded Demo Carts and Fix Studio Includes
+      - name: Wipe All Embedded Demo Carts and Fix Studio/Tools Includes
         run: |
           python3 -c "
           import os, re
           
+          # 1. lua.c içindeki eksik demoları temizle
           lua_path = 'src/api/lua.c'
           if os.path.exists(lua_path):
               content = open(lua_path).read()
@@ -57,12 +58,15 @@ jobs:
               open(lua_path, 'w').write(cleaned)
               print('Gömülü demolar lua.c içinden temizlendi!')
           
+          # 2. main.c içindeki editör/studio bağımlılıklarını pasif yap
           main_path = 'src/system/sdl/main.c'
           if os.path.exists(main_path):
               content = open(main_path).read()
+              # Hem studio/system.h hem de tools.h satırlarını devre dışı bırakıyoruz
               cleaned = content.replace('#include \"studio/system.h\"', '// #include \"studio/system.h\"')
+              cleaned = cleaned.replace('#include \"tools.h\"', '// #include \"tools.h\"')
               open(main_path, 'w').write(cleaned)
-              print('main.c içindeki studio/system.h satırı pasif yapıldı!')
+              print('main.c içindeki studio ve tools bağımlılıkları temizlendi!')
           "
 
       - name: Prepare Assets
