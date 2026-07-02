@@ -13,7 +13,7 @@ jobs:
       - name: Setup Android SDK and NDK
         uses: android-actions/setup-android@v3
 
-      - name: Wipe All Embedded Demo Carts and Neutralize Main.c
+      - name: Wipe Embedded Carts and Inject Android Main Fix
         run: |
           python3 -c "
           import os, re
@@ -24,16 +24,30 @@ jobs:
               content = open(lua_path).read()
               cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
               open(lua_path, 'w').write(cleaned)
-          
-          # 2. main.c'yi sembolik bir koda çevir
-          main_path = 'src/system/sdl/main.c'
-          if os.path.exists(main_path):
-              open(main_path, 'w').write('int tic80_main_dummy(void) { return 0; }')
+              
+          # 2. SDL'in Android ana giriş sembolünü (SDL_main) player.c içine enjekte et
+          player_path = 'src/system/sdl/player.c'
+          if os.path.exists(player_path):
+              content = open(player_path).read()
+              if 'SDL_main' not in content:
+                  # Standart main fonksiyonunu SDL_main olarak değiştirerek Android uyumlu yapıyoruz
+                  content = content.replace('int main(int argc, char** argv)', '#include \"SDL_main.h\"\nint SDL_main(int argc, char** argv)')
+                  open(player_path, 'w').write(content)
           "
 
-      - name: Manual C++ Build via CMake (Independent from Gradle)
+      - name: Force Player-SDL to Shared Library for Android
         run: |
-          # NDK yolunu dinamik olarak kesinleştiriyoruz
+          python3 -c "
+          # player-sdl'in executable yerine .so üretmesi için CMake tanımını değiştiriyoruz
+          path = 'CMakeLists.txt'
+          if os.path.exists(path):
+              content = open(path).read()
+              content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
+              open(path, 'w').write(content)
+          "
+
+      - name: Pure Player C++ Build via CMake
+        run: |
           NDK_PATH="${ANDROID_HOME}/ndk/23.2.8568313"
           if [ ! -d "$NDK_PATH" ]; then
             NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
@@ -43,7 +57,7 @@ jobs:
           
           mkdir -p build_android && cd build_android
           
-          # Standart Android Toolchain ile doğrudan LLD'yi zorlayarak derleme başlatıyoruz
+          # PRO kapalı, sadece PLAYER açık şekilde yalın kurulum
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a \
@@ -51,7 +65,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DANDROID_LD=lld \
             -DBUILD_WITH_ALL=OFF \
-            -DBUILD_PRO=ON \
+            -DBUILD_PRO=OFF \
             -DBUILD_EDITORS=OFF \
             -DBUILD_SURF=OFF \
             -DBUILD_NET=OFF \
@@ -59,13 +73,15 @@ jobs:
             -DBUILD_WITH_JANET=OFF \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
           
-          # Hedefleri tek tek elle çağırmak yerine bağımlılıkları CMake'e bırakıp genel derleme yapıyoruz
-          make -j$(nproc)
+          # Sadece player-sdl ve SDL2 hedeflerini inşa et, stüdyo kütüphanelerini pas geç
+          make -j$(nproc) player-sdl SDL2
           
-          # Derlenen tüm .so ve .a kütüphanelerini Gradle'ın paketleme dizinine taşıyoruz
+          # Çıkan tüm .so dosyalarını Gradle paketleme dizinine at
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
           find bin/ -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
-          find lib/ -name "*.a" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
+          find lib/ -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
+          # Eğer player-sdl lib/ altında oluştuysa onu da jniLibs içine çek
+          find . -name "libplayer-sdl.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
 
       - name: Strip Native Debugging Elements from build.gradle
         run: |
@@ -73,11 +89,9 @@ jobs:
           path = 'android/app/build.gradle'
           content = open(path).read()
           
-          # Gradle'ın içeride otomatik C++ derleme tetiklemesini TAMAMEN siliyoruz
           import re
           content = re.sub(r'externalNativeBuild\s*\{.*?\}', '', content, flags=re.DOTALL)
           
-          # Temiz defaultConfig ayarını ekle (Sadece jniLibs'i paketleyecek)
           build_config = '''
           android {
               defaultConfig {
