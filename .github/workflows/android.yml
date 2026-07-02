@@ -34,18 +34,26 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
-      - name: Hard Rewrite player-sdl Target to SHARED Library
+      - name: Hard Rewrite player-sdl Target to SHARED Library (Regex Fix)
         run: |
           python3 -c "
-          import os
+          import os, re
           path = 'CMakeLists.txt'
           if os.path.exists(path):
               content = open(path).read()
               
-              # CRITICAL FIX: player-sdl hedefini executable yerine SHARED kütüphaneye dönüştürüyoruz
-              content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
+              # GÜVENLİ REGEX FIX: add_executable ile player-sdl arasındaki tüm boşluk/alt satır varyasyonlarını yakalar
+              # ve onu sorunsuz bir şekilde add_library(... SHARED) formatına çevirir.
+              pattern = r'add_executable\s*\(\s*player-sdl'
+              if re.search(pattern, content):
+                  content = re.sub(pattern, 'add_library(player-sdl SHARED', content)
+                  print('player-sdl hedefi SHARED kütüphaneye dönüştürüldü!')
+              else:
+                  print('UYARI: add_executable(player-sdl) deseni doğrudan bulunamadı, alternatif aranıyor...')
+                  # Eğer alt CMakeLists dosyalarında veya farklı bir formatta ise hepsini ezmeye çalış
+                  content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
               
-              # Android için çıktı ismini Java tarafının aradığı 'tic80' ismiyle mühürlüyoruz
+              # Android için çıktı ismini Java tarafının arayacağı 'tic80' ismiyle mühürlüyoruz
               linker_override = '''
               
               if(ANDROID)
@@ -56,7 +64,6 @@ jobs:
               endif()
               '''
               open(path, 'w').write(content + linker_override)
-              print('player-sdl hedefi basariyla SHARED kütüphaneye zorlandi!')
           "
 
       - name: Fix CMake Path and Inject Player Flags Safely
