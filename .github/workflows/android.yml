@@ -13,7 +13,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Wipe Embedded Carts and Inject Android Main Fix
+      - name: Wipe Embedded Carts and Keep Standart Main
         run: |
           python3 -c "
           import os, re
@@ -24,60 +24,21 @@ jobs:
               content = open(lua_path).read()
               cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
               open(lua_path, 'w').write(cleaned)
-              
-          # 2. SDL'in Android ana giriş sembolünü (SDL_main) player.c içine enjekte et
-          player_path = 'src/system/sdl/player.c'
-          if os.path.exists(player_path):
-              content = open(player_path).read()
-              if 'SDL_main' not in content:
-                  content = content.replace('int main(int argc, char** argv)', '#include \"SDL_main.h\"\nint SDL_main(int argc, char** argv)')
-                  open(player_path, 'w').write(content)
           "
 
-      - name: Hard Rewrite player-sdl Target to SHARED Library (Regex Fix)
-        run: |
-          python3 -c "
-          import os, re
-          path = 'CMakeLists.txt'
-          if os.path.exists(path):
-              content = open(path).read()
-              
-              # GÜVENLİ REGEX FIX: add_executable ile player-sdl arasındaki tüm boşluk/alt satır varyasyonlarını yakalar
-              # ve onu sorunsuz bir şekilde add_library(... SHARED) formatına çevirir.
-              pattern = r'add_executable\s*\(\s*player-sdl'
-              if re.search(pattern, content):
-                  content = re.sub(pattern, 'add_library(player-sdl SHARED', content)
-                  print('player-sdl hedefi SHARED kütüphaneye dönüştürüldü!')
-              else:
-                  print('UYARI: add_executable(player-sdl) deseni doğrudan bulunamadı, alternatif aranıyor...')
-                  # Eğer alt CMakeLists dosyalarında veya farklı bir formatta ise hepsini ezmeye çalış
-                  content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
-              
-              # Android için çıktı ismini Java tarafının arayacağı 'tic80' ismiyle mühürlüyoruz
-              linker_override = '''
-              
-              if(ANDROID)
-                  set_target_properties(player-sdl PROPERTIES 
-                      OUTPUT_NAME \"tic80\"
-                      SUFFIX \".so\"
-                  )
-              endif()
-              '''
-              open(path, 'w').write(content + linker_override)
-          "
-
-      - name: Fix CMake Path and Inject Player Flags Safely
+      - name: Fix CMake Path and Inject True Android Flags Safely
         run: |
           python3 -c "
           import os, re
           content = open('android/app/build.gradle').read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. Sadece dosya yolunu düzeltiyoruz (Senin çalışan kısmın)
+          # 1. Sadece dosya yolunu düzeltiyoruz
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
           # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
+          # Hem oyuncu modunu açıyoruz hem de derleyicinin 'main' sembolünü SDL_main olarak map etmesini sagliyoruz!
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_C_FLAGS=-Dmain=SDL_main\", \"-DCMAKE_CXX_FLAGS=-Dmain=SDL_main\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
