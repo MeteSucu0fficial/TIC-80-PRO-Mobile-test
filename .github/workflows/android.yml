@@ -45,7 +45,7 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-      - name: Wipe All Embedded Demo Carts and Fix Main.c Environment
+      - name: Wipe All Embedded Demo Carts and Swap Main.c with Player.c
         run: |
           python3 -c "
           import os, re
@@ -58,20 +58,13 @@ jobs:
               open(lua_path, 'w').write(cleaned)
               print('Gömülü demolar lua.c içinden temizlendi!')
           
-          # 2. main.c içindeki stüdyo bloklarını tamamen bypass et
+          # 2. Mayın tarlası olan main.c'yi saf player.c ile değiştirerek stüdyo bağımlılığını kökten çöz
           main_path = 'src/system/sdl/main.c'
-          if os.path.exists(main_path):
-              content = open(main_path).read()
-              
-              # main.c'nin en başına BUILD_EDITORS'ı tamamen kapatacak emri veriyoruz
-              # ve sorun çıkaran include satırlarını tamamen etkisiz hale getiriyoruz
-              content = content.replace('#if defined(BUILD_EDITORS)', '#if 0')
-              content = content.replace('#include \"studio/system.h\"', '// #include \"studio/system.h\"')
-              content = content.replace('#include \"tools.h\"', '// #include \"tools.h\"')
-              content = content.replace('#include \"ext/fft.h\"', '// #include \"ext/fft.h\"')
-              
-              open(main_path, 'w').write(content)
-              print('main.c stüdyo blokları #if 0 ile bypass edildi!')
+          player_path = 'src/system/sdl/player.c'
+          if os.path.exists(player_path) and os.path.exists(main_path):
+              player_content = open(player_path).read()
+              open(main_path, 'w').write(player_content)
+              print('main.c içeriği saf player.c ile başarıyla değiştirildi!')
           "
 
       - name: Prepare Assets
