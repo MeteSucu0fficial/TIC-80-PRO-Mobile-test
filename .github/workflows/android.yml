@@ -87,24 +87,20 @@ jobs:
           
           make -j$(nproc) player-sdl
           
-          # Garanti olsun diye her iki olası dizini de oluşturuyoruz
-          mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
-          mkdir -p ../android/app/libs/arm64-v8a
+          # Sadece tek ve net bir jniLibs klasörü oluşturuyoruz, çakışma yaratan 'libs' elendi!
+          TARGET_JNI_DIR="../android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$TARGET_JNI_DIR"
           
-          # Üretilen tüm .so'ları iki tarafa da kopyala
-          find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
-          find . -name "*.so" -exec cp {} ../android/app/libs/arm64-v8a/ \;
+          # Üretilen .so dosyalarını taşı
+          find . -name "*.so" -exec cp {} "$TARGET_JNI_DIR/" \;
           
-          # İsim eşitlemelerini her iki klasörde de sağlama alıyoruz
-          if [ -f "../android/app/src/main/jniLibs/arm64-v8a/libplayer-sdl.so" ]; then
-            cp ../android/app/src/main/jniLibs/arm64-v8a/libplayer-sdl.so ../android/app/src/main/jniLibs/arm64-v8a/libtic80.so
-          fi
-          if [ -f "../android/app/libs/arm64-v8a/libplayer-sdl.so" ]; then
-            cp ../android/app/libs/arm64-v8a/libplayer-sdl.so ../android/app/libs/arm64-v8a/libtic80.so
+          # İsim eşitlemesini tek bir yerde tertemiz yapıyoruz
+          if [ -f "$TARGET_JNI_DIR/libplayer-sdl.so" ]; then
+            cp "$TARGET_JNI_DIR/libplayer-sdl.so" "$TARGET_JNI_DIR/libtic80.so"
           fi
           
-          echo "Kütüphaneler paketleme klasörlerine başarıyla mühürlendi!"
-          ls -la ../android/app/src/main/jniLibs/arm64-v8a/
+          echo "Kütüphaneler paketleme klasörüne mühürlendi:"
+          ls -la "$TARGET_JNI_DIR/"
 
       - name: Overwrite build.gradle dynamically from assets/name.txt
         run: |
@@ -141,8 +137,8 @@ jobs:
 
               sourceSets {{
                   main {{
-                      // Gradle'ın kafası karışmasın diye doğrudan iki dizini de hedef gösteriyoruz
-                      jniLibs.srcDirs = ['src/main/jniLibs', 'libs']
+                      // Çakışmayı önlemek için sadece src/main/jniLibs klasörünü bırakıyoruz
+                      jniLibs.srcDirs = ['src/main/jniLibs']
                   }}
               }}
 
@@ -159,7 +155,7 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle jniLibs yolları düzeltilerek oluşturuldu!')
+          print('build.gradle tekil jniLibs yolu ile güncellendi!')
           "
 
       - name: Inject AndroidX Properties Fix
