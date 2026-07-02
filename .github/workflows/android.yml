@@ -59,60 +59,7 @@ jobs:
               print('Linker kuralları kilitlendi!')
           "
 
-      - name: Pure Player C++ Build via CMake
-        run: |
-          NDK_PATH="${ANDROID_HOME}/ndk/23.2.8568313"
-          if [ ! -d "$NDK_PATH" ]; then
-            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
-          fi
-          
-          echo "Kullanılan NDK: $NDK_PATH"
-          
-          mkdir -p build_android && cd build_android
-          
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-24 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DANDROID_LD=lld \
-            -DBUILD_WITH_ALL=OFF \
-            -DBUILD_PRO=OFF \
-            -DBUILD_EDITORS=OFF \
-            -DBUILD_SURF=OFF \
-            -DBUILD_NET=OFF \
-            -DBUILD_PLAYER=ON \
-            -DBUILD_WITH_JANET=OFF \
-            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
-          
-          make -j$(nproc) player-sdl
-          
-          TARGET_JNI_DIR="../android/app/src/main/jniLibs/arm64-v8a"
-          mkdir -p "$TARGET_JNI_DIR"
-          
-          # Bizim derlediğiz ana dosyayı kopyala
-          find . -name "*.so" -exec cp {} "$TARGET_JNI_DIR/" \;
-          cp "$TARGET_JNI_DIR/libtic80.so" "$TARGET_JNI_DIR/libplayer-sdl.so" || true
-
-      - name: Inject Pre-built Official SDL2 Libraries for Android arm64-v8a
-        run: |
-          TARGET_JNI_DIR="android/app/src/main/jniLibs/arm64-v8a"
-          
-          # Resmi pre-built SDL2 Android kütüphanesini sunucuya çekiyoruz
-          curl -L -o sdl2_android.tar.gz https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-2.28.5.tar.gz
-          tar -xzf sdl2_android.tar.gz
-          
-          # İndirilen paketten Android arm64-v8a için hazır olan libSDL2.so dosyasını bul ve bizim jniLibs içine kopyala
-          # Şayet pakette hazır yoksa evrensel bir pre-built arm64 SDL2 .so dosyasını doğrudan çekelim (Garanti yöntem)
-          curl -L -o "$TARGET_JNI_DIR/libSDL2.so" https://github.com/vitas/openssl-android-prebuilt/raw/master/arm64-v8a/libcrypto.so || true 
-          
-          # Burası en temiz bağımsız SDL2 deposundan çekim:
-          curl -L -o "$TARGET_JNI_DIR/libSDL2.so" https://raw.githubusercontent.com/RentAnAdviser/Precompiled-Libraries/main/Android/arm64-v8a/libSDL2.so
-          
-          echo "Kütüphane klasörünün son tam dizilimi:"
-          ls -la "$TARGET_JNI_DIR/"
-
-      - name: Overwrite build.gradle dynamically from assets/name.txt
+      - name: Overwrite build.gradle to use Native CMake Compilation
         run: |
           python3 -c "
           import os
@@ -123,6 +70,8 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
+          # KESİN ÇÖZÜM: Gradle'a projenin ana CMakeLists.txt dosyasını doğrudan gösteriyoruz.
+          # Böylece C++ derlemesini haricen değil, paketleme esnasında Gradle kendisi yapacak.
           clean_gradle = f'''
           plugins {{
               id 'com.android.application'
@@ -138,14 +87,29 @@ jobs:
                   targetSdk 34
                   versionCode 1
                   versionName '1.0'
-                  ndk {{
-                      abiFilters 'arm64-v8a'
+                  
+                  externalNativeBuild {{
+                      cmake {{
+                          arguments \"-DANDROID_STL=c++_shared\",
+                                    \"-DBUILD_WITH_ALL=OFF\",
+                                    \"-DBUILD_PRO=OFF\",
+                                    \"-DBUILD_EDITORS=OFF\",
+                                    \"-DBUILD_SURF=OFF\",
+                                    \"-DBUILD_NET=OFF\",
+                                    \"-DBUILD_PLAYER=ON\",
+                                    \"-DBUILD_WITH_JANET=OFF\",
+                                    \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON\"
+                          abiFilters 'arm64-v8a'
+                          targets 'player-sdl'
+                      }}
                   }}
               }}
 
-              sourceSets {{
-                  main {{
-                      jniLibs.srcDirs = ['src/main/jniLibs']
+              externalNativeBuild {{
+                  cmake {{
+                      // Ana dizindeki CMakeLists.txt dosyasını Gradle'a bağlıyoruz
+                      path \"../../CMakeLists.txt\"
+                      version \"3.22.1\"
                   }}
               }}
 
@@ -162,11 +126,19 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
+          print('build.gradle Native CMake derleme ayarlarıyla güncellendi!')
           "
 
-      - name: Inject AndroidX Properties Fix
+      - name: Inject AndroidX Properties & Specify NDK Path
         run: |
-          echo -e "android.useAndroidX=true\nandroid.enableJetifier=true" > android/gradle.properties
+          NDK_PATH="${ANDROID_HOME}/ndk/23.2.8568313"
+          if [ ! -d "$NDK_PATH" ]; then
+            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
+          fi
+          echo "android.useAndroidX=true" > android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          # Gradle'ın doğru NDK'yı kullanmasını garanti ediyoruz
+          echo "ndk.dir=$NDK_PATH" >> android/local.properties
 
       - name: Fix AndroidManifest Package & Authorities
         run: |
@@ -214,7 +186,7 @@ jobs:
             sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
           fi
 
-      - name: Build APK (Packaging Only)
+      - name: Build APK (Full Native Compilation & Packaging)
         run: |
           cd android
           chmod +x gradlew
