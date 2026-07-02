@@ -45,11 +45,9 @@ jobs:
               # Hedefi kütüphaneye çevir
               content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
               
-              # Linker'ın 'main' sembolü aramasını engellemek için kuralları dosyanın sonuna gömüyoruz
               linker_override = '''
               
               if(ANDROID)
-                  # Linker'a kesinlikle shared library ürettiğini ve giriş noktasının SDL_main olduğunu söylüyoruz
                   set_target_properties(player-sdl PROPERTIES 
                       LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main\"
                       SUFFIX \".so\"
@@ -86,39 +84,44 @@ jobs:
             -DBUILD_WITH_JANET=OFF \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
           
-          # Derlemeyi tetikle
           make -j$(nproc) player-sdl
           
+          # jniLibs dizinini oluştur ve .so dosyalarını taşı
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
-          # Üretilen paylaşılan nesneleri (.so) jniLibs içine kopyala
           find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
           echo "Toplanan .so dosyaları:"
           ls -la ../android/app/src/main/jniLibs/arm64-v8a/
 
-      - name: Strip Native Debugging Elements from build.gradle
+      - name: Inject Clean Packaging Config to build.gradle
         run: |
           python3 -c "
           import os, re
           path = 'android/app/build.gradle'
           content = open(path).read()
           
+          # Eski externalNativeBuild (C++ derleme) bloklarını tamamen temizle
           content = re.sub(r'externalNativeBuild\s*\{.*?\}', '', content, flags=re.DOTALL)
           
-          build_config = '''
-          android {
+          # Dosyanın en sonundaki android { ... } kapanış parantezinden hemen önce ayarlarımızı güvenli bir şekilde enjekte ediyoruz
+          # jniLibs klasörünü el ile doldurduğumuz için Gradle'a o dizine bakmasını söylüyoruz
+          if 'jniLibs.srcDirs' not in content:
+              config_to_inject = '''
+              sourceSets {
+                  main {
+                      jniLibs.srcDirs = ['src/main/jniLibs']
+                  }
+              }
               defaultConfig {
                   ndk { abiFilters 'arm64-v8a' }
               }
-              buildTypes {
-                  release {
-                      minifyEnabled true
-                      shrinkResources true
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-              }
-          }
           '''
-          open(path, 'w').write(content + build_config)
+              # Son süslü parantezin hemen öncesine yerleştirerek sözdizimini koruyoruz
+              r_index = content.rfind('}')
+              if r_index != -1:
+                  content = content[:r_index] + config_to_inject + content[r_index:]
+          
+          open(path, 'w').write(content)
+          print('build.gradle parantez hatası yaratmayacak şekilde güncellendi!')
           "
 
       - name: Prepare Assets
