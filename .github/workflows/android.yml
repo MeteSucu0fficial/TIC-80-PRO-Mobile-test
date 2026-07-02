@@ -141,7 +141,7 @@ jobs:
         run: |
           # Gradle'ın AndroidX kütüphanelerini kabul etmesi için gereken özellikleri enjekte ediyoruz
           echo -e "android.useAndroidX=true\nandroid.enableJetifier=true" > android/gradle.properties
-          print("gradle.properties AndroidX desteğiyle oluşturuldu!")
+          echo "gradle.properties AndroidX desteğiyle oluşturuldu!"
 
       - name: Prepare Assets
         run: |
