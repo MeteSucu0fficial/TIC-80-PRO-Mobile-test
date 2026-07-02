@@ -48,7 +48,6 @@ jobs:
               linker_override = '''
               
               if(ANDROID)
-                  # Çıktı ismini Android Java tarafının aradığı 'tic80' ismine zorluyoruz
                   set_target_properties(player-sdl PROPERTIES 
                       OUTPUT_NAME \"tic80\"
                       LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main\"
@@ -88,17 +87,23 @@ jobs:
           
           make -j$(nproc) player-sdl
           
+          # Garanti olsun diye her iki olası dizini de oluşturuyoruz
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p ../android/app/libs/arm64-v8a
           
-          # Hem üretilen ana kütüphaneyi hem de varsa bağımlı tüm .so'ları jniLibs altına kopyala
+          # Üretilen tüm .so'ları iki tarafa da kopyala
           find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
+          find . -name "*.so" -exec cp {} ../android/app/libs/arm64-v8a/ \;
           
-          # Eğer dosya ismi libplayer-sdl.so olarak çıktıysa, manuel olarak libtic80.so ismine de kopyalayarak çift dikiş garantiye alıyoruz
+          # İsim eşitlemelerini her iki klasörde de sağlama alıyoruz
           if [ -f "../android/app/src/main/jniLibs/arm64-v8a/libplayer-sdl.so" ]; then
             cp ../android/app/src/main/jniLibs/arm64-v8a/libplayer-sdl.so ../android/app/src/main/jniLibs/arm64-v8a/libtic80.so
           fi
+          if [ -f "../android/app/libs/arm64-v8a/libplayer-sdl.so" ]; then
+            cp ../android/app/libs/arm64-v8a/libplayer-sdl.so ../android/app/libs/arm64-v8a/libtic80.so
+          fi
           
-          echo "JniLibs içeriği kontrol ediliyor:"
+          echo "Kütüphaneler paketleme klasörlerine başarıyla mühürlendi!"
           ls -la ../android/app/src/main/jniLibs/arm64-v8a/
 
       - name: Overwrite build.gradle dynamically from assets/name.txt
@@ -136,7 +141,8 @@ jobs:
 
               sourceSets {{
                   main {{
-                      jniLibs.srcDirs = ['src/main/jniLibs']
+                      // Gradle'ın kafası karışmasın diye doğrudan iki dizini de hedef gösteriyoruz
+                      jniLibs.srcDirs = ['src/main/jniLibs', 'libs']
                   }}
               }}
 
@@ -153,7 +159,7 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle dinamik ID ile başarıyla oluşturuldu!')
+          print('build.gradle jniLibs yolları düzeltilerek oluşturuldu!')
           "
 
       - name: Inject AndroidX Properties Fix
