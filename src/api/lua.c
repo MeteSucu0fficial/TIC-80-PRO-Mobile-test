@@ -143,7 +143,7 @@ static void evalLua(tic_mem* tic, const char* code)
 
 static const u8 DemoRom[] =
 {
-    #include "../build/assets/luademo.tic.dat"
+    // #include "../build/assets/luademo.tic.dat"
 };
 
 static const u8 MarkRom[] =
