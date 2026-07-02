@@ -48,14 +48,16 @@ jobs:
               linker_override = '''
               
               if(ANDROID)
+                  # Çıktı ismini Android Java tarafının aradığı 'tic80' ismine zorluyoruz
                   set_target_properties(player-sdl PROPERTIES 
+                      OUTPUT_NAME \"tic80\"
                       LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main\"
                       SUFFIX \".so\"
                   )
               endif()
               '''
               open(path, 'w').write(content + linker_override)
-              print('Linker kuralları player-sdl için başarıyla kilitlendi!')
+              print('Linker kuralları ve OUTPUT_NAME tic80 olarak kilitlendi!')
           "
 
       - name: Pure Player C++ Build via CMake
@@ -87,8 +89,16 @@ jobs:
           make -j$(nproc) player-sdl
           
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
+          
+          # Hem üretilen ana kütüphaneyi hem de varsa bağımlı tüm .so'ları jniLibs altına kopyala
           find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
-          echo "Toplanan .so dosyaları:"
+          
+          # Eğer dosya ismi libplayer-sdl.so olarak çıktıysa, manuel olarak libtic80.so ismine de kopyalayarak çift dikiş garantiye alıyoruz
+          if [ -f "../android/app/src/main/jniLibs/arm64-v8a/libplayer-sdl.so" ]; then
+            cp ../android/app/src/main/jniLibs/arm64-v8a/libplayer-sdl.so ../android/app/src/main/jniLibs/arm64-v8a/libtic80.so
+          fi
+          
+          echo "JniLibs içeriği kontrol ediliyor:"
           ls -la ../android/app/src/main/jniLibs/arm64-v8a/
 
       - name: Overwrite build.gradle dynamically from assets/name.txt
@@ -156,7 +166,6 @@ jobs:
           python3 -c "
           import os, re
           
-          # Yeni paket adını name.txt'den çekiyoruz
           package_id = 'com.nesbox.tic'
           if os.path.exists('assets/name.txt'):
               lines = open('assets/name.txt').read().splitlines()
@@ -166,14 +175,9 @@ jobs:
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               content = open(manifest_path).read()
-              
-              # 1. Eski package='...' niteliğini uçur
               content = re.sub(r'package=\"[^\"]*\"', '', content)
-              
-              # 2. Manifest içindeki çakışma yaratan eski authority stringlerini yeni ID ile değiştir
               content = content.replace('com.nesbox.tic.documents', f'{package_id}.documents')
               content = content.replace('com.nesbox.tic.fileprovider', f'{package_id}.fileprovider')
-              
               open(manifest_path, 'w').write(content)
               print(f'AndroidManifest.xml başarıyla {package_id} için sterilize edildi!')
           "
