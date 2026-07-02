@@ -18,7 +18,7 @@ jobs:
           python3 -c "
           import os, re
           
-          # 1. lua.c içindeki eksik varsayılan demoları temizle (Çökmeyi engeller)
+          # 1. lua.c içindeki eksik varsayılan demoları temizle
           lua_path = 'src/api/lua.c'
           if os.path.exists(lua_path):
               content = open(lua_path).read()
@@ -44,9 +44,9 @@ jobs:
           # 1. Sadece dosya yolunu düzeltiyoruz (Senin çalışan kısmın)
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz (Senin çalışan yöntemin)
-          # KESİN OYUNCU AYARLARI: Editörler kapalı, sadece oyun oynatıcı aktif!
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
+          # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz
+          # CRITICAL FIX: 'targets' belirterek sadece 'player-sdl' derlemesini istiyoruz, sorun çıkaran 'tic80' hedefini muaf tutuyoruz!
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
@@ -85,7 +85,6 @@ jobs:
         run: |
           if [ -f "assets/icon.png" ]; then
             RES_DIR="android/app/src/main/res"
-            # XML tabanlı eski ikonları temizle ki bizim PNG baskın gelsin
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml || true
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml || true
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
@@ -97,16 +96,12 @@ jobs:
 
       - name: Prepare Assets & Inject Gömülü Oyun (cart.tic)
         run: |
-          # 1. Klasörleri emniyete alıyoruz
           mkdir -p build/assets
           mkdir -p android/app/build/assets
           
-          # 2. assets klasöründeki her şeyi kopyala
           cp -r assets/* build/assets/ || true
           cp -r assets/* android/app/build/assets/ || true
           
-          # 3. KESİN ÇÖZÜM: Eğer assets içinde cart.tic varsa, bunu TIC-80'in Android'de
-          # otomatik açtığı dahili ana klasöre (assets/) 'cart.tic' adıyla gömüyoruz.
           if [ -f "assets/cart.tic" ]; then
             mkdir -p android/app/src/main/assets
             cp assets/cart.tic android/app/src/main/assets/cart.tic
