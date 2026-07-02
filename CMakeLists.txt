@@ -41,14 +41,14 @@ endif()
 set(BUILD_WITH_ALL_DEFAULT OFF)
 
 option(BUILD_STATIC "Static runtime" ${BUILD_STATIC_DEFAULT})
-option(BUILD_WITH_ALL "Build all supported scripts" ${BUILD_WITH_ALL_DEFAULT})
+option(BUILD_WITH_ALL "Build all supported scripts" OFF)
 option(BUILD_SDL "SDL Enabled" ON)
 option(BUILD_SDLGPU "SDL GPU Enabled" OFF)
 option(BUILD_LIBRETRO "libretro Enabled" ${BUILD_LIBRETRO_DEFAULT})
 option(BUILD_TOOLS "bin2txt prj2cart" OFF)
-option(BUILD_EDITORS "Build cart editors" ON)
+option(BUILD_EDITORS "Build cart editors" OFF)
 option(BUILD_PRO "Build PRO version" ON)
-option(BUILD_PLAYER "Build standalone players" OFF)
+option(BUILD_PLAYER "Build standalone players" ON)
 option(BUILD_TOUCH_INPUT "Build with touch input support" ON)
 option(BUILD_NO_OPTIMIZATION "Build without optimizations for debugging" OFF)
 option(BUILD_ASAN_DEBUG "Build with AddressSanitizer" OFF)
@@ -168,23 +168,23 @@ include(cmake/png.cmake)
 include(cmake/tools.cmake)
 
 include(cmake/lua.cmake)
-include(cmake/moon.cmake)
-include(cmake/yue.cmake)
-include(cmake/fennel.cmake)
-include(cmake/wren.cmake)
-include(cmake/mruby.cmake)
-include(cmake/wasm.cmake)
-include(cmake/scheme.cmake)
-include(cmake/squirrel.cmake)
-include(cmake/pocketpy.cmake)
-include(cmake/quickjs.cmake)
-include(cmake/janet.cmake)
+## include(cmake/moon.cmake)   # Başına # koyarak kapat
+## include(cmake/yue.cmake)    # Başına # koyarak kapat
+## include(cmake/fennel.cmake) # Başına # koyarak kapat
+## include(cmake/wren.cmake)   # Başına # koyarak kapat
+## include(cmake/mruby.cmake)  # Başına # koyarak kapat
+## include(cmake/wasm.cmake)   # Başına # koyarak kapat
+## include(cmake/scheme.cmake) # Başına # koyarak kapat
+## include(cmake/squirrel.cmake) # Başına # koyarak kapat
+## include(cmake/pocketpy.cmake) # Başına # koyarak kapat
+## include(cmake/quickjs.cmake)  # Başına # koyarak kapat (JavaScript/JS'yi kapatır)
+## include(cmake/janet.cmake)    # Başına # koyarak kapat
 
 include(cmake/core.cmake)
 include(cmake/wave.cmake)
 include(cmake/argparse.cmake)
 include(cmake/naett.cmake)
-include(cmake/studio.cmake)
+## include(cmake/studio.cmake)
 
 include(cmake/sdl.cmake)
 include(cmake/libretro.cmake)
