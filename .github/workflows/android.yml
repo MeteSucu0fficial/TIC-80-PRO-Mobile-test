@@ -45,10 +45,10 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-      - name: Wipe All Embedded Demo Carts and Swap Main.c with Fixed Player.c
+      - name: Wipe All Embedded Demo Carts and Swap Main.c with Local Include Fixed Player.c
         run: |
           python3 -c "
-          import os, re
+          import os, re, shutil
           
           # 1. lua.c içindeki eksik demoları temizle
           lua_path = 'src/api/lua.c'
@@ -58,17 +58,25 @@ jobs:
               open(lua_path, 'w').write(cleaned)
               print('Gömülü demolar lua.c içinden temizlendi!')
           
-          # 2. main.c yerine player.c'yi kopyala ve içindeki sistem include'unu yerel include ile düzelt
+          # 2. tic80.h dosyasını doğrudan sdl klasörüne taşıyıp main.c'yi lokal bağlama zorlama
           main_path = 'src/system/sdl/main.c'
           player_path = 'src/system/sdl/player.c'
+          header_src = 'include/tic80.h'
+          header_dest = 'src/system/sdl/tic80.h'
+          
+          # tic80.h'ı main.c'nin yanına kopyala
+          if os.path.exists(header_src):
+              shutil.copyfile(header_src, header_dest)
+              print('tic80.h lokal klasöre kopyalandı!')
+          
           if os.path.exists(player_path) and os.path.exists(main_path):
               player_content = open(player_path).read()
               
-              # Derleyicinin tic80.h'ı bulabilmesi için include yolunu bağıl (relative) yapıyoruz
-              fixed_content = player_content.replace('#include <tic80.h>', '#include \"../../include/tic80.h\"')
+              # Artık doğrudan yanındaki dosyayı görecek şekilde yerel çağrı yapıyoruz
+              fixed_content = player_content.replace('#include <tic80.h>', '#include \"tic80.h\"')
               
               open(main_path, 'w').write(fixed_content)
-              print('main.c içeriği güncellendi ve tic80.h include yolu düzeltildi!')
+              print('main.c içeriği lokal tic80.h referansı ile güncellendi!')
           "
 
       - name: Prepare Assets
