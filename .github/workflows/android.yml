@@ -34,7 +34,7 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
-      - name: Hard Rewrite player-sdl Target & Force Linker Flags
+      - name: Hard Rewrite player-sdl Target & Force Modern LLD Linker
         run: |
           python3 -c "
           import os
@@ -45,21 +45,22 @@ jobs:
               # Hedefi kütüphaneye çevir
               content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
               
+              # CRITICAL FIX: Eski -fuse-ld=gold flag'lerini tamamen bertaraf etmek için LINK_FLAGS içine -fuse-ld=lld gömüyoruz
               linker_override = '''
               
               if(ANDROID)
                   set_target_properties(player-sdl PROPERTIES 
                       OUTPUT_NAME \"tic80\"
-                      LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main\"
+                      LINK_FLAGS \"-shared -Wl,--no-undefined -Wl,--entry=SDL_main -fuse-ld=lld\"
                       SUFFIX \".so\"
                   )
               endif()
               '''
               open(path, 'w').write(content + linker_override)
-              print('Linker kuralları kilitlendi!')
+              print('Modern LLD Linker kuralları mühürlendi!')
           "
 
-      - name: Overwrite build.gradle to use Native CMake Compilation with Dynamic NDK
+      - name: Overwrite build.gradle to use Native CMake Compilation with Modern Linker
         run: |
           python3 -c "
           import os
@@ -70,9 +71,6 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
-          # Env'den saptanan gerçek NDK versiyonunu almaya çalışalım, yoksa saptananı boş bırakıp Gradle'a bırakacağız
-          ndk_ver = os.environ.get('DETECTED_NDK_VERSION', '')
-
           clean_gradle = f'''
           plugins {{
               id 'com.android.application'
@@ -82,7 +80,6 @@ jobs:
               namespace 'com.nesbox.tic'
               compileSdk 34
               
-              // CRITICAL FIX: Projenin aradığı NDK versiyon çelişkisini çözmek için burayı temizliyoruz veya üsttekini bastırıyoruz
               if (project.hasProperty('forcedNdkVersion')) {{
                   ndkVersion = project.property('forcedNdkVersion')
               }}
@@ -96,7 +93,9 @@ jobs:
                   
                   externalNativeBuild {{
                       cmake {{
+                          # CRITICAL FIX: Gradle tarafında da derleyiciye lld kullanmasını emrediyoruz
                           arguments \"-DANDROID_STL=c++_shared\",
+                                    \"-DANDROID_LD=lld\",
                                     \"-DBUILD_WITH_ALL=OFF\",
                                     \"-DBUILD_PRO=OFF\",
                                     \"-DBUILD_EDITORS=OFF\",
@@ -131,22 +130,16 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle dinamik NDK desteğiyle güncellendi!')
+          print('build.gradle LLD ayarlarıyla senkronize edildi!')
           "
 
-      - name: Inject AndroidX Properties & Extract NDK Metadata
+      - name: Inject AndroidX Properties & Specify NDK Path
         run: |
-          # Sunucudaki gerçek NDK yolunu ve versiyonunu tam saptıyoruz
           NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
           NDK_VER=$(basename "$NDK_PATH")
           
-          echo "Kullanılacak Gerçek NDK Yolu: $NDK_PATH"
-          echo "Kullanılacak Gerçek NDK Versiyonu: $NDK_VER"
-          
           echo "android.useAndroidX=true" > android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
-          
-          # Gradle parametresi olarak gerçek NDK versiyonunu içeriye fırlatıyoruz
           echo "forcedNdkVersion=$NDK_VER" >> android/gradle.properties
           echo "ndk.dir=$NDK_PATH" > android/local.properties
 
