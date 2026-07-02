@@ -33,7 +33,7 @@ jobs:
 
       - name: Manual C++ Build via CMake (Independent from Gradle)
         run: |
-          # NDK ve Toolchain yollarını kesinleştiriyoruz
+          # NDK yolunu dinamik olarak kesinleştiriyoruz
           NDK_PATH="${ANDROID_HOME}/ndk/23.2.8568313"
           if [ ! -d "$NDK_PATH" ]; then
             NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
@@ -59,12 +59,13 @@ jobs:
             -DBUILD_WITH_JANET=OFF \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
           
-          make -j$(nproc) tic80 player-sdl SDL2
+          # Hedefleri tek tek elle çağırmak yerine bağımlılıkları CMake'e bırakıp genel derleme yapıyoruz
+          make -j$(nproc)
           
-          # Derlenen kütüphaneleri Gradle'ın paketleme dizinine kopyalıyoruz
+          # Derlenen tüm .so ve .a kütüphanelerini Gradle'ın paketleme dizinine taşıyoruz
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
-          cp bin/*.so ../android/app/src/main/jniLibs/arm64-v8a/ || true
-          cp lib/*.a ../android/app/src/main/jniLibs/arm64-v8a/ || true
+          find bin/ -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
+          find lib/ -name "*.a" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
 
       - name: Strip Native Debugging Elements from build.gradle
         run: |
