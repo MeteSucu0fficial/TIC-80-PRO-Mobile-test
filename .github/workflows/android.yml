@@ -34,6 +34,31 @@ jobs:
                   open(player_path, 'w').write(content)
           "
 
+      - name: Hard Rewrite player-sdl Target to SHARED Library
+        run: |
+          python3 -c "
+          import os
+          path = 'CMakeLists.txt'
+          if os.path.exists(path):
+              content = open(path).read()
+              
+              # CRITICAL FIX: player-sdl hedefini executable yerine SHARED kütüphaneye dönüştürüyoruz
+              content = content.replace('add_executable(player-sdl', 'add_library(player-sdl SHARED')
+              
+              # Android için çıktı ismini Java tarafının aradığı 'tic80' ismiyle mühürlüyoruz
+              linker_override = '''
+              
+              if(ANDROID)
+                  set_target_properties(player-sdl PROPERTIES 
+                      OUTPUT_NAME \"tic80\"
+                      SUFFIX \".so\"
+                  )
+              endif()
+              '''
+              open(path, 'w').write(content + linker_override)
+              print('player-sdl hedefi basariyla SHARED kütüphaneye zorlandi!')
+          "
+
       - name: Fix CMake Path and Inject Player Flags Safely
         run: |
           python3 -c "
@@ -45,7 +70,6 @@ jobs:
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
           # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz
-          # CRITICAL FIX: 'targets' belirterek sadece 'player-sdl' derlemesini istiyoruz, sorun çıkaran 'tic80' hedefini muaf tutuyoruz!
           content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
