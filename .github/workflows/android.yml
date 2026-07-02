@@ -26,23 +26,23 @@ jobs:
               open(lua_path, 'w').write(cleaned)
           "
 
-      - name: Fix CMake Path and Inject True Android Flags Safely
+      - name: Fix CMake Path and Inject Player Flags Safely
         run: |
           python3 -c "
           import os, re
           content = open('android/app/build.gradle').read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. Sadece dosya yolunu düzeltiyoruz
+          # 1. Fix the CMake path
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. Dosyanın EN ALTINA yeni bloğu ekliyoruz
-          # Hem oyuncu modunu açıyoruz hem de derleyicinin 'main' sembolünü SDL_main olarak map etmesini sagliyoruz!
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_C_FLAGS=-Dmain=SDL_main\", \"-DCMAKE_CXX_FLAGS=-Dmain=SDL_main\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
+          # 2. Add CMake arguments WITHOUT problematic -Dmain=SDL_main flags
+          # SDL_main is automatically linked on Android, no need to force it here
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
-          echo "---- Dosyanın Son Hali (Kontrol) ----"
+          echo "---- File tail (verification) ----"
           tail -n 15 android/app/build.gradle
 
       - name: Fix AndroidManifest Package ID from name.txt
