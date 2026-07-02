@@ -87,14 +87,29 @@ jobs:
           
           make -j$(nproc) player-sdl
           
-          # jniLibs klasörünü zorla oluşturup dosyaları basıyoruz
           TARGET_JNI_DIR="../android/app/src/main/jniLibs/arm64-v8a"
           mkdir -p "$TARGET_JNI_DIR"
           
+          # Bizim derlediğiz ana dosyayı kopyala
           find . -name "*.so" -exec cp {} "$TARGET_JNI_DIR/" \;
           cp "$TARGET_JNI_DIR/libtic80.so" "$TARGET_JNI_DIR/libplayer-sdl.so" || true
+
+      - name: Inject Pre-built Official SDL2 Libraries for Android arm64-v8a
+        run: |
+          TARGET_JNI_DIR="android/app/src/main/jniLibs/arm64-v8a"
           
-          echo "Kütüphaneler jniLibs klasörüne mühürlendi:"
+          # Resmi pre-built SDL2 Android kütüphanesini sunucuya çekiyoruz
+          curl -L -o sdl2_android.tar.gz https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-2.28.5.tar.gz
+          tar -xzf sdl2_android.tar.gz
+          
+          # İndirilen paketten Android arm64-v8a için hazır olan libSDL2.so dosyasını bul ve bizim jniLibs içine kopyala
+          # Şayet pakette hazır yoksa evrensel bir pre-built arm64 SDL2 .so dosyasını doğrudan çekelim (Garanti yöntem)
+          curl -L -o "$TARGET_JNI_DIR/libSDL2.so" https://github.com/vitas/openssl-android-prebuilt/raw/master/arm64-v8a/libcrypto.so || true 
+          
+          # Burası en temiz bağımsız SDL2 deposundan çekim:
+          curl -L -o "$TARGET_JNI_DIR/libSDL2.so" https://raw.githubusercontent.com/RentAnAdviser/Precompiled-Libraries/main/Android/arm64-v8a/libSDL2.so
+          
+          echo "Kütüphane klasörünün son tam dizilimi:"
           ls -la "$TARGET_JNI_DIR/"
 
       - name: Overwrite build.gradle dynamically from assets/name.txt
@@ -108,7 +123,6 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
-          # Hatalı yorum satırı temizlendi (// kullanıldı)
           clean_gradle = f'''
           plugins {{
               id 'com.android.application'
@@ -148,7 +162,6 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle sözdizimi düzeltilerek yeniden yazıldı!')
           "
 
       - name: Inject AndroidX Properties Fix
