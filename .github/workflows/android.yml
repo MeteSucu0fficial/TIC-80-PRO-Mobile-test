@@ -17,15 +17,12 @@ jobs:
         run: |
           python3 -c "
           import os, re
-          # build.gradle dosyasını oku
           path = 'android/app/build.gradle'
           content = open(path).read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # CMake yolunu düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # BUILD_WITH_ALL=OFF eklenerek çakışma giderildi
           args = '-DBUILD_WITH_ALL=OFF\", \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
           
           build_config = f'''
@@ -46,6 +43,19 @@ jobs:
           }}
           '''
           open(path, 'w').write(content + build_config)
+          "
+
+      - name: Wipe All Embedded Demo Carts from Source
+        run: |
+          python3 -c "
+          import os, re
+          path = 'src/api/lua.c'
+          if os.path.exists(path):
+              content = open(path).read()
+              # build/assets klasöründen include edilmeye çalışılan tüm .dat satırlarını bulup yorum satırına çevirir
+              cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
+              open(path, 'w').write(cleaned)
+              print('Bütün gömülü demolar lua.c içinden başarıyla temizlendi!')
           "
 
       - name: Prepare Assets
