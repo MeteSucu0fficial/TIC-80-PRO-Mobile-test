@@ -45,7 +45,7 @@ jobs:
           open(path, 'w').write(content + build_config)
           "
 
-      - name: Wipe All Embedded Demo Carts and Swap Main.c with Player.c
+      - name: Wipe All Embedded Demo Carts and Swap Main.c with Fixed Player.c
         run: |
           python3 -c "
           import os, re
@@ -58,13 +58,17 @@ jobs:
               open(lua_path, 'w').write(cleaned)
               print('Gömülü demolar lua.c içinden temizlendi!')
           
-          # 2. Mayın tarlası olan main.c'yi saf player.c ile değiştirerek stüdyo bağımlılığını kökten çöz
+          # 2. main.c yerine player.c'yi kopyala ve içindeki sistem include'unu yerel include ile düzelt
           main_path = 'src/system/sdl/main.c'
           player_path = 'src/system/sdl/player.c'
           if os.path.exists(player_path) and os.path.exists(main_path):
               player_content = open(player_path).read()
-              open(main_path, 'w').write(player_content)
-              print('main.c içeriği saf player.c ile başarıyla değiştirildi!')
+              
+              # Derleyicinin tic80.h'ı bulabilmesi için include yolunu bağıl (relative) yapıyoruz
+              fixed_content = player_content.replace('#include <tic80.h>', '#include \"../../include/tic80.h\"')
+              
+              open(main_path, 'w').write(fixed_content)
+              print('main.c içeriği güncellendi ve tic80.h include yolu düzeltildi!')
           "
 
       - name: Prepare Assets
