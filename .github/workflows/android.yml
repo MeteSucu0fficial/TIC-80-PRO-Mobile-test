@@ -59,7 +59,7 @@ jobs:
               print('Linker kuralları kilitlendi!')
           "
 
-      - name: Overwrite build.gradle to use Native CMake Compilation
+      - name: Overwrite build.gradle to use Native CMake Compilation with Dynamic NDK
         run: |
           python3 -c "
           import os
@@ -70,8 +70,9 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
-          # KESİN ÇÖZÜM: Gradle'a projenin ana CMakeLists.txt dosyasını doğrudan gösteriyoruz.
-          # Böylece C++ derlemesini haricen değil, paketleme esnasında Gradle kendisi yapacak.
+          # Env'den saptanan gerçek NDK versiyonunu almaya çalışalım, yoksa saptananı boş bırakıp Gradle'a bırakacağız
+          ndk_ver = os.environ.get('DETECTED_NDK_VERSION', '')
+
           clean_gradle = f'''
           plugins {{
               id 'com.android.application'
@@ -80,6 +81,11 @@ jobs:
           android {{
               namespace 'com.nesbox.tic'
               compileSdk 34
+              
+              // CRITICAL FIX: Projenin aradığı NDK versiyon çelişkisini çözmek için burayı temizliyoruz veya üsttekini bastırıyoruz
+              if (project.hasProperty('forcedNdkVersion')) {{
+                  ndkVersion = project.property('forcedNdkVersion')
+              }}
 
               defaultConfig {{
                   applicationId '{package_id}'
@@ -107,7 +113,6 @@ jobs:
 
               externalNativeBuild {{
                   cmake {{
-                      // Ana dizindeki CMakeLists.txt dosyasını Gradle'a bağlıyoruz
                       path \"../../CMakeLists.txt\"
                       version \"3.22.1\"
                   }}
@@ -126,19 +131,24 @@ jobs:
           }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle Native CMake derleme ayarlarıyla güncellendi!')
+          print('build.gradle dinamik NDK desteğiyle güncellendi!')
           "
 
-      - name: Inject AndroidX Properties & Specify NDK Path
+      - name: Inject AndroidX Properties & Extract NDK Metadata
         run: |
-          NDK_PATH="${ANDROID_HOME}/ndk/23.2.8568313"
-          if [ ! -d "$NDK_PATH" ]; then
-            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
-          fi
+          # Sunucudaki gerçek NDK yolunu ve versiyonunu tam saptıyoruz
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
+          NDK_VER=$(basename "$NDK_PATH")
+          
+          echo "Kullanılacak Gerçek NDK Yolu: $NDK_PATH"
+          echo "Kullanılacak Gerçek NDK Versiyonu: $NDK_VER"
+          
           echo "android.useAndroidX=true" > android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
-          # Gradle'ın doğru NDK'yı kullanmasını garanti ediyoruz
-          echo "ndk.dir=$NDK_PATH" >> android/local.properties
+          
+          # Gradle parametresi olarak gerçek NDK versiyonunu içeriye fırlatıyoruz
+          echo "forcedNdkVersion=$NDK_VER" >> android/gradle.properties
+          echo "ndk.dir=$NDK_PATH" > android/local.properties
 
       - name: Fix AndroidManifest Package & Authorities
         run: |
