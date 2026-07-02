@@ -139,9 +139,21 @@ jobs:
 
       - name: Inject AndroidX Properties Fix
         run: |
-          # Gradle'ın AndroidX kütüphanelerini kabul etmesi için gereken özellikleri enjekte ediyoruz
           echo -e "android.useAndroidX=true\nandroid.enableJetifier=true" > android/gradle.properties
           echo "gradle.properties AndroidX desteğiyle oluşturuldu!"
+
+      - name: Fix AndroidManifest Package Attribute
+        run: |
+          python3 -c "
+          import os, re
+          manifest_path = 'android/app/src/main/AndroidManifest.xml'
+          if os.path.exists(manifest_path):
+              content = open(manifest_path).read()
+              # manifest tag'i içindeki eski package='...' tanımını tamamen uçuruyoruz
+              cleaned = re.sub(r'package=\"[^\"]*\"', '', content)
+              open(manifest_path, 'w').write(cleaned)
+              print('AndroidManifest.xml içindeki eski package tanımı temizlendi!')
+          "
 
       - name: Prepare Assets
         run: |
