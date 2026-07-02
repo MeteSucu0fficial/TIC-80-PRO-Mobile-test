@@ -86,56 +86,67 @@ jobs:
           
           make -j$(nproc) player-sdl
           
-          # jniLibs dizinini oluştur ve .so dosyalarını taşı
           mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
           find . -name "*.so" -exec cp {} ../android/app/src/main/jniLibs/arm64-v8a/ \;
           echo "Toplanan .so dosyaları:"
           ls -la ../android/app/src/main/jniLibs/arm64-v8a/
 
-      - name: Overwrite build.gradle to Absolute Clean State
+      - name: Overwrite build.gradle dynamically from assets/name.txt
         run: |
           python3 -c "
-          # Java sınıflarının R kaynağını bulabilmesi için paketi com.nesbox.tic (orijinal) olarak güncelledik
-          clean_gradle = '''
-          plugins {
-              id 'com.android.application'
-          }
+          import os
+          
+          # Varsayılan paket adı (name.txt yoksa veya 2. satır boşsa diye)
+          package_id = 'com.nesbox.tic'
+          
+          # assets/name.txt dosyasının 2. satırını okuyoruz
+          if os.path.exists('assets/name.txt'):
+              lines = open('assets/name.txt').read().splitlines()
+              if len(lines) >= 2 and lines[1].strip():
+                  package_id = lines[1].strip()
+          
+          print(f'Uygulama Paket Kimliği Ayarlanıyor: {package_id}')
 
-          android {
+          clean_gradle = f'''
+          plugins {{
+              id 'com.android.application'
+          }}
+
+          android {{
               namespace 'com.nesbox.tic'
               compileSdk 34
 
-              defaultConfig {
-                  applicationId 'com.nesbox.tic'
+              defaultConfig {{
+                  applicationId '{package_id}'
                   minSdk 24
                   targetSdk 34
                   versionCode 1
                   versionName '1.0'
-                  ndk {
+                  ndk {{
                       abiFilters 'arm64-v8a'
-                  }
-              }
+                  }}
+              }}
 
-              sourceSets {
-                  main {
+              sourceSets {{
+                  main {{
                       jniLibs.srcDirs = ['src/main/jniLibs']
-                  }
-              }
+                  }}
+              }}
 
-              buildTypes {
-                  release {
+              buildTypes {{
+                  release {{
                       minifyEnabled false
                       proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-              }
-          }
+                  }}
+              }}
+          }}
 
-          dependencies {
+          dependencies {{
               implementation 'androidx.appcompat:appcompat:1.6.1'
-          }
+          }}
           '''
           open('android/app/build.gradle', 'w').write(clean_gradle)
-          print('build.gradle paket uyumluluğu düzeltilerek yeniden oluşturuldu!')
+          print('build.gradle dinamik ID ile başarıyla oluşturuldu!')
           "
 
       - name: Inject AndroidX Properties Fix
@@ -177,7 +188,8 @@ jobs:
         run: |
           STRINGS_FILE="android/app/src/main/res/values/strings.xml"
           if [ -f "assets/name.txt" ]; then
-            APP_NAME=$(cat assets/name.txt | tr -d '\n\r')
+            # Sadece 1. satırı uygulamanın görünen ismi yapıyoruz
+            APP_NAME=$(head -n 1 assets/name.txt | tr -d '\n\r')
             sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
           fi
 
