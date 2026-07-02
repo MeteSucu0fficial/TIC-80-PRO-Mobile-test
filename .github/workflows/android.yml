@@ -13,28 +13,30 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Physical Linker Swap (Force LLD over Gold)
+      - name: Dynamic Linker Hijack (Auto-Find NDK and Force LLD)
         run: |
-          # NDK içindeki toolchain dizinine gidiyoruz
-          NDK_BIN_DIR="/usr/local/lib/android/sdk/ndk/23.2.8568313/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "Sistemdeki NDK dizini taranıyor ve linker'lar manipüle ediliyor..."
           
-          if [ -d "$NDK_BIN_DIR" ]; then
-            echo "NDK Toolchain dizini bulundu, fiziksel yer değiştirme yapılıyor..."
-            cd "$NDK_BIN_DIR"
+          # ANDROID_HOME altındaki tüm NDK klasörlerinde ld.gold dosyasını bul ve lld ile ez
+          # Eğer ANDROID_HOME boşsa /usr/local/lib/android/sdk dizinine bakar
+          SEARCH_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          
+          find "$SEARCH_PATH" -type f -name "ld.gold" 2>/dev/null | while read -r gold_path; do
+            dir_path=$(dirname "$gold_path")
+            echo "Hedef linker bulundu: $dir_path"
             
-            # Eski gold linker'ı yedekle
+            cd "$dir_path"
+            # Fiziksel olarak gold'u lld ile değiştiriyoruz
             mv ld.gold ld.gold.bak || true
-            rm -f aarch64-linux-android-ld.gold || true
+            cp ld.lld ld.gold || true
             
-            # lld'yi gold ismiyle kopyala (Sistem ne isterse istesin lld çalışacak)
-            cp ld.lld ld.gold
-            ln -sf ld.lld aarch64-linux-android-ld.gold || true
-            
-            echo "Linker hilesi başarıyla uygulandı!"
-          else
-            echo "HATA: NDK dizini bulunamadı!"
-            exit 1
-          fi
+            # Olası mimari ön ekli sembolik linkleri de lld'ye yönlendir
+            if [ -f "aarch64-linux-android-ld.gold" ] || [ -L "aarch64-linux-android-ld.gold" ]; then
+              rm -f aarch64-linux-android-ld.gold
+              ln -sf ld.lld aarch64-linux-android-ld.gold || true
+            fi
+            echo "Bu dizindeki Gold linker başarıyla LLD ile değiştirildi!"
+          done
 
       - name: Inject Build Config
         run: |
