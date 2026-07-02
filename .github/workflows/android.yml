@@ -13,39 +13,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Wipe Embedded Carts and Keep Standart Main
+      - name: Prepare Assets & Inject Game (cart.tic)
         run: |
-          python3 -c "
-          import os, re
+          mkdir -p build/assets
+          mkdir -p android/app/build/assets
           
-          # 1. lua.c içindeki eksik varsayılan demoları temizle
-          lua_path = 'src/api/lua.c'
-          if os.path.exists(lua_path):
-              content = open(lua_path).read()
-              cleaned = re.sub(r'(#include\s+[\"\']\.\./build/assets/.*?\.dat[\"\'])', r'// \1', content)
-              open(lua_path, 'w').write(cleaned)
-          "
+          cp -r assets/* build/assets/ || true
+          cp -r assets/* android/app/build/assets/ || true
+          
+          if [ -f "assets/cart.tic" ]; then
+            mkdir -p android/app/src/main/assets
+            cp assets/cart.tic android/app/src/main/assets/cart.tic
+            echo "Game (cart.tic) embedded successfully!"
+          fi
 
-      - name: Fix CMake Path and Inject Player Flags Safely
-        run: |
-          python3 -c "
-          import os, re
-          content = open('android/app/build.gradle').read()
-          workspace = os.environ.get('GITHUB_WORKSPACE', '')
-          
-          # 1. Fix the CMake path
-          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
-          
-          # 2. Add CMake arguments WITHOUT problematic -Dmain=SDL_main flags
-          # SDL_main is automatically linked on Android, no need to force it here
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\"\n            }\n        }\n    }\n}\n'
-          
-          open('android/app/build.gradle', 'w').write(content)
-          "
-          echo "---- File tail (verification) ----"
-          tail -n 15 android/app/build.gradle
-
-      - name: Fix AndroidManifest Package ID from name.txt
+      - name: Fix AndroidManifest Package ID
         run: |
           python3 -c "
           import os, re
@@ -65,7 +47,7 @@ jobs:
               open(manifest_path, 'w').write(content)
           "
 
-      - name: Inject Dynamic App Name from name.txt
+      - name: Inject App Name from name.txt
         run: |
           STRINGS_FILE="android/app/src/main/res/values/strings.xml"
           if [ -f "assets/name.txt" ]; then
@@ -86,27 +68,13 @@ jobs:
             done
           fi
 
-      - name: Prepare Assets & Inject Gömülü Oyun (cart.tic)
-        run: |
-          mkdir -p build/assets
-          mkdir -p android/app/build/assets
-          
-          cp -r assets/* build/assets/ || true
-          cp -r assets/* android/app/build/assets/ || true
-          
-          if [ -f "assets/cart.tic" ]; then
-            mkdir -p android/app/src/main/assets
-            cp assets/cart.tic android/app/src/main/assets/cart.tic
-            echo "Oyun (cart.tic) uygulamanın kalbine gömüldü!"
-          fi
-
-      - name: Build APK (Gradle)
+      - name: Build APK (Gradle) - Player Only
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Find and Upload ANY APK
+      - name: Find and Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TIC80-Custom-Player-APK
