@@ -1,18 +1,34 @@
-- name: Fix CMake Path and Inject Flags Safely
+name: Build Android APK
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Inject Build Config and Fix CMake
         run: |
           python3 -c "
           import os, re
-          content = open('android/app/build.gradle').read()
+          # build.gradle dosyasını oku
+          path = 'android/app/build.gradle'
+          content = open(path).read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
           # CMake yolunu düzelt
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # Editörsüz, Sadece Oyuncu Modu için Argümanlar
+          # Editörsüz, sadece Player modunda yapılandırma ekle
           args = '-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_NET=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\", \"-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
           
-          # Ayarları en alta ekle
-          content += f'''
+          build_config = f'''
           android {{
               defaultConfig {{
                   ndk {{ abiFilters \"arm64-v8a\" }}
@@ -29,5 +45,50 @@
               }}
           }}
           '''
-          open('android/app/build.gradle', 'w').write(content)
+          open(path, 'w').write(content + build_config)
           "
+
+      - name: Prepare Assets
+        run: |
+          mkdir -p android/app/build/assets
+          cp -r assets/* android/app/build/assets/ || true
+
+      - name: Auto-Replace App Icon from Assets
+        run: |
+          if [ -f "assets/icon.png" ]; then
+            echo "icon.png bulundu, uygulama ikonları değiştiriliyor..."
+            RES_DIR="android/app/src/main/res"
+            rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml
+            rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml
+            for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+              mkdir -p "$RES_DIR/$dir"
+              cp assets/icon.png "$RES_DIR/$dir/ic_launcher.png"
+              cp assets/icon.png "$RES_DIR/$dir/ic_launcher_round.png"
+            done
+          fi
+
+      - name: Auto-Change App Name from Assets
+        run: |
+          # Eğer assets içinde name.txt varsa, uygulamanın adını değiştir
+          STRINGS_FILE="android/app/src/main/res/values/strings.xml"
+          if [ -f "assets/name.txt" ]; then
+            APP_NAME=$(cat assets/name.txt | tr -d '\n\r')
+            echo "Uygulama ismi '$APP_NAME' olarak değiştiriliyor..."
+            
+            # strings.xml içindeki app_name değerini yeni isimle değiştirir
+            sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
+          else
+            echo "assets/name.txt bulunamadı, varsayılan isim kalacak."
+          fi
+
+      - name: Build APK (Gradle)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TIC80-Player-APK
+          path: '**/*.apk'
