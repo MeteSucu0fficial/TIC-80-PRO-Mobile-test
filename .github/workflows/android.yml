@@ -10,95 +10,113 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup Java Environment
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Hardcore Patch C Code to Lock Player Mode & Disable Editor/Console
+      # Botun önerdiği akıllı sdkmanager tespiti ve hatasız kurulum adımı
+      - name: Install Android SDK components & accept licenses
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/tools/bin:$PATH"
+          
+          SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMAN" ]; then
+            SDKMAN="sdkmanager"
+          fi
+          
+          yes | $SDKMAN --licenses
+          $SDKMAN "platforms;android-31" "build-tools;31.0.0" "ndk;23.2.8568313" "cmake;3.22.1"
+
+      - name: Teach CMake Where studio/system.h Is Safely
         run: |
           python3 -c "
           import os
-          
-          # 1. Editöre geçişi sağlayan modu ve ESC/Konsol tetikleyicilerini tamamen kör ediyoruz
-          studio_c = 'src/studio/studio.c'
-          if os.path.exists(studio_c):
-              content = open(studio_c).read()
-              
-              # Editör moduna geçiş fonksiyonlarını etkisiz hale getiriyoruz
-              content = content.replace('void studio_init', 'void studio_init_disabled')
-              
-              # ESC basıldığında veya konsol çağrıldığında modu değiştiren mantığı kırıyoruz
-              # set_studio_mode veya benzeri mod geçişlerini doğrudan bypass et
-              if 'set_studio_mode' in content:
-                  content = content.replace('void set_studio_mode', 'void set_studio_mode_disabled')
-              
-              open(studio_c, 'w').write(content)
-              print('studio.c mod geçişleri ve editör tetikleyicileri kökten engellendi!')
-
-          # 2. Ana SDL girişinde sadece ve sadece player döngüsünü zorla
-          main_c = 'src/system/sdl/main.c'
-          if os.path.exists(main_c):
-              content = open(main_c).read()
-              
-              # Kodun içinde editör arayüzünü çizen veya güncelleyen tic_core_start / studio_tick gibi
-              # alanlar varsa, buralarda menü veya konsol butonlarının çalışmasını engellemek için
-              # sistemin her zaman 'TIC_PLAYER_MODE' veya sadece oyun modunda kalmasını söylüyoruz.
-              # Kod seviyesinde 'studio' nesnesinin modunu kalıcı olarak oyun moduna (0 veya player index) çekiyoruz.
-              open(main_c, 'w').write(content)
-              print('main.c üzerinde player kilitleri atıldı.')
+          path = 'CMakeLists.txt'
+          fix_block = '\ninclude_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)\n'
+          if os.path.exists(path):
+              content = open(path, 'r', encoding='utf-8').read()
+              if fix_block not in content:
+                  open(path, 'w', encoding='utf-8').write(content + fix_block)
+                  print('CMake yolu güvenli bir şekilde eklendi.')
           "
 
-      - name: Fix CMake Path and Inject Safe Target
+      # Dosyanın sonuna eklemek yerine mevcut 'android {' bloğunun içine sızan akıllı Gradle enjektörü
+      - name: Inject Safe Gradle Targets (Smart In-Place Merge)
         run: |
           python3 -c "
           import os, re
-          content = open('android/app/build.gradle').read()
-          workspace = os.environ.get('GITHUB_WORKSPACE', '')
-          
-          # Dosya yolunu düzeltiyoruz
-          content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
-          
-          # Derleyicinin hata vermeden geçtiği tek mod olan 'tic80' hedefini veriyoruz.
-          # Yukarıda kod seviyesinde editörü kırdığımız için bu hedef artık sadece bir player gibi davranacak.
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=ON\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"tic80\"\n            }\n        }\n    }\n}\n'
-          
-          open('android/app/build.gradle', 'w').write(content)
+          path = 'android/app/build.gradle'
+          if os.path.exists(path):
+              content = open(path, 'r', encoding='utf-8').read()
+              workspace = os.environ.get('GITHUB_WORKSPACE', '').replace('\\', '/')
+              
+              # Orijinal CMake yolunu güncelliyoruz
+              content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
+              
+              # Eğer daha önce eklenmediyse, mevcut 'android {' ifadesini bulup hemen içine gömüyoruz
+              if \"targets 'tic80'\" not in content and 'targets \"tic80\"' not in content:
+                  target_block = '''
+      defaultConfig {
+          externalNativeBuild {
+              cmake {
+                  arguments '-DBUILD_PRO=OFF', '-DBUILD_EDITORS=OFF', '-DBUILD_SURF=OFF', '-DBUILD_PLAYER=ON', '-DBUILD_WITH_JANET=OFF'
+                  targets 'tic80'
+              }
+          }
+      }
+  '''
+                  # 'android {' satırından hemen sonrasına enjekte ederek Gradle yapısını bozmuyoruz
+                  content = content.replace('android {', f'android {{\n{target_block}')
+                  open(path, 'w', encoding='utf-8').write(content)
+                  print('Gradle argümanları orijinal android bloğunun içine başarıyla gömüldü.')
+              else:
+                  print('Gradle argümanları zaten mevcut, işlem atlandı.')
           "
-          echo "---- build.gradle Son Satırları ----"
-          tail -n 15 android/app/build.gradle
 
-      - name: Dynamic Name & Package ID Injection from assets/name.txt
+      - name: Advanced Manifest & Strings Injection (ElementTree)
         run: |
           python3 -c "
-          import os, re
+          import os
+          from xml.etree import ElementTree as ET
           
           package_id = 'com.nesbox.tic'
           app_name = 'TIC-80 Player'
           
           if os.path.exists('assets/name.txt'):
               lines = open('assets/name.txt').read().splitlines()
-              if len(lines) >= 1 and lines[0].strip():
-                  app_name = lines[0].strip()
-              if len(lines) >= 2 and lines[1].strip():
-                  package_id = lines[1].strip()
+              if len(lines) >= 1 and lines[0].strip(): app_name = lines[0].strip()
+              if len(lines) >= 2 and lines[1].strip(): package_id = lines[1].strip()
 
-          # Manifest güncellemeleri
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
-              content = open(manifest_path).read()
-              content = re.sub(r'package=\"[^\"]*\"', '', content)
-              content = content.replace('com.nesbox.tic.documents', f'{package_id}.documents')
-              content = content.replace('com.nesbox.tic.fileprovider', f'{package_id}.fileprovider')
-              open(manifest_path, 'w').write(content)
+              ET.register_namespace('android', 'http://schemas.android.com/apk/res/android')
+              tree = ET.parse(manifest_path)
+              root = tree.getroot()
+              root.set('package', package_id)
+              
+              for provider in root.findall('.//provider'):
+                  auth = provider.get('{http://schemas.android.com/apk/res/android}authorities')
+                  if auth and 'com.nesbox.tic' in auth:
+                      provider.set('{http://schemas.android.com/apk/res/android}authorities', auth.replace('com.nesbox.tic', package_id))
+              
+              tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
 
-          # strings.xml (Uygulama ismi)
           strings_path = 'android/app/src/main/res/values/strings.xml'
           if os.path.exists(strings_path):
-              content = open(strings_path).read()
-              content = re.sub(r'<string name=\"app_name\">.*?</string>', f'<string name=\"app_name\">{app_name}</string>', content)
-              open(strings_path, 'w').write(content)
+              tree = ET.parse(strings_path)
+              for string in tree.getroot().findall('string'):
+                  if string.get('name') == 'app_name':
+                      string.text = app_name
+              tree.write(strings_path, encoding='utf-8')
           "
 
-      - name: Inject Custom App Icon (icon.png)
+      - name: Inject Custom App Icon (Safe Single PNG)
         run: |
           if [ -f "assets/icon.png" ]; then
             RES_DIR="android/app/src/main/res"
@@ -121,14 +139,25 @@ jobs:
           if [ -f "assets/cart.tic" ]; then
             mkdir -p android/app/src/main/assets
             cp assets/cart.tic android/app/src/main/assets/cart.tic
-            echo "Oyun (cart.tic) başarıyla mühürlendi!"
+            echo "Oyun (cart.tic) varlıklara başarıyla eklendi!"
           fi
 
       - name: Build APK (Gradle)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace --info
+
+      # Botun ısrarla istediği derinlemesine hata ayıklama ve çıktı doğrulama listesi
+      - name: Debug Output Triage & Native Library Listing
+        run: |
+          echo "=== Java ve Gradle Durumu ==="
+          echo "JAVA_HOME=$JAVA_HOME"
+          cd android && ./gradlew --version || true
+          echo "=== Derlenen Derlenmiş Native (.so) Kütüphaneleri ==="
+          find . -name '*.so' -print || true
+          echo "=== Nihai Çıktı Klasör Yapısı ==="
+          ls -R app/build/outputs || true
 
       - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
