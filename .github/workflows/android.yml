@@ -19,22 +19,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Botun en kritik uyarısı: sdkmanager yollarını PATH'e ekleyip lisansları garantiliyoruz
       - name: Install Android SDK components & accept licenses
         run: |
           export ANDROID_SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/tools/bin:$PATH"
-          
-          SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMAN" ]; then
-            SDKMAN="sdkmanager"
-          fi
-          
-          yes | $SDKMAN --licenses
-          $SDKMAN "platforms;android-31" "build-tools;31.0.0" "ndk;23.2.8568313" "cmake;3.22.1"
+          yes | sdkmanager --licenses
+          sdkmanager --install "platforms;android-31" "build-tools;31.0.0" "ndk;23.2.8568313" "cmake;3.22.1"
 
       - name: Teach CMake Where studio/system.h Is Safely
         run: |
-          python3 -c "
+          python3 <<'PY'
           import os
           path = 'CMakeLists.txt'
           fix_block = '\ninclude_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)\n'
@@ -42,53 +37,57 @@ jobs:
               content = open(path, 'r', encoding='utf-8').read()
               if fix_block not in content:
                   open(path, 'w', encoding='utf-8').write(content + fix_block)
-          "
+                  print('CMake yolu güvenli bir şekilde eklendi.')
+              else:
+                  print('CMake yolu zaten mevcut, eklenmedi.')
+          else:
+              print('CMakeLists.txt bulunamadı; atlanıyor.')
+          PY
 
-      # Sıfırdan blok eklemek yerine, mevcut defaultConfig içindeki cmake alanını nokta atışı günceller
-      - name: Curgical Modification of build.gradle Arguments
+      # Kaçış karakteri (backslash) hatasını bitiren üçlü tırnaklı (triple-quoted) Gradle enjeksiyonu
+      - name: Inject Safe Gradle Targets
         run: |
-          python3 -c "
+          python3 <<'PY'
           import os, re
           path = 'android/app/build.gradle'
           if os.path.exists(path):
               content = open(path, 'r', encoding='utf-8').read()
               workspace = os.environ.get('GITHUB_WORKSPACE', '').replace('\\', '/')
-              
-              # 1. CMakeLists.txt yolunu güncelle
-              content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
-              
-              # 2. Mevcut externalNativeBuild -> cmake bloğunu bulup argümanları ve hedefi güvenle ezer
-              # Parantez yapısını asla bozmaz, sadece içerideki metni değiştirir
-              if 'targets' not in content or 'tic80' not in content:
-                  # Mevcut cmake { ... } bloğunu yakalamaya çalışıyoruz veya defaultConfig altına temizce yerleştiriyoruz
-                  cmake_replacement = '''cmake {
-                      arguments '-DBUILD_PRO=OFF', '-DBUILD_EDITORS=OFF', '-DBUILD_SURF=OFF', '-DBUILD_PLAYER=ON', '-DBUILD_WITH_JANET=OFF'
-                      targets 'tic80'
-                  }'''
-                  
-                  # Eğer dosyada zaten bir 'cmake {' tanımı varsa onu bu temiz versiyonla değiştiriyoruz
-                  if 'cmake {' in content:
-                      # İlk eşleşen genel tanımlamayı değiştirmek için
-                      content = re.sub(r'cmake\s*\{[^}]*\}', cmake_replacement, content, count=1)
-                  else:
-                      # Yoksa defaultConfig altına ekle
-                      content = content.replace('defaultConfig {', f'defaultConfig {{\n        externalNativeBuild {{\n            {cmake_replacement}\n        }}')
-                  
-                  open(path, 'w', encoding='utf-8').write(content)
-                  print('build.gradle cerrahi müdahaleyle güncellendi.')
+
+              # Orijinal CMake yolunu güncelliyoruz
+              content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path "{workspace}/CMakeLists.txt"', content)
+
+              # Daha dar bir kontrol: sadece tic80 hedefinin zaten olup olmadığına bak
+              if "targets 'tic80'" not in content and 'targets "tic80"' not in content:
+                  block = """\
+          android {
+              defaultConfig {
+                  externalNativeBuild {
+                      cmake {
+                          arguments '-DBUILD_PRO=OFF', '-DBUILD_EDITORS=OFF', '-DBUILD_SURF=OFF', '-DBUILD_PLAYER=ON', '-DBUILD_WITH_JANET=OFF'
+                          targets 'tic80'
+                      }
+                  }
+              }
+          }
+          """
+                  open(path, 'w', encoding='utf-8').write(content + block)
+                  print('Gradle argümanları ters eğik çizgi olmadan başarıyla eklendi.')
               else:
-                  print('Ayarlar zaten mevcut görünüyor.')
-          "
+                  print('Gradle argümanları zaten mevcut; ekleme yapılmadı.')
+          else:
+              print('android/app/build.gradle bulunamadı; atlanıyor.')
+          PY
 
       - name: Advanced Manifest & Strings Injection (ElementTree)
         run: |
-          python3 -c "
+          python3 <<'PY'
           import os
           from xml.etree import ElementTree as ET
-          
+
           package_id = 'com.nesbox.tic'
           app_name = 'TIC-80 Player'
-          
+
           if os.path.exists('assets/name.txt'):
               lines = open('assets/name.txt').read().splitlines()
               if len(lines) >= 1 and lines[0].strip(): app_name = lines[0].strip()
@@ -100,13 +99,16 @@ jobs:
               tree = ET.parse(manifest_path)
               root = tree.getroot()
               root.set('package', package_id)
-              
+
               for provider in root.findall('.//provider'):
                   auth = provider.get('{http://schemas.android.com/apk/res/android}authorities')
                   if auth and 'com.nesbox.tic' in auth:
                       provider.set('{http://schemas.android.com/apk/res/android}authorities', auth.replace('com.nesbox.tic', package_id))
-              
+
               tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
+              print('Manifest XML yapısı güvenle güncellendi.')
+          else:
+              print('AndroidManifest.xml bulunamadı; atlanıyor.')
 
           strings_path = 'android/app/src/main/res/values/strings.xml'
           if os.path.exists(strings_path):
@@ -115,7 +117,10 @@ jobs:
                   if string.get('name') == 'app_name':
                       string.text = app_name
               tree.write(strings_path, encoding='utf-8')
-          "
+              print('Uygulama ismi güvenle strings.xml içine yazıldı.')
+          else:
+              print('strings.xml bulunamadı; atlanıyor.')
+          PY
 
       - name: Inject Custom App Icon (Safe Single PNG)
         run: |
@@ -136,10 +141,11 @@ jobs:
           cp -r assets/* build/assets/ || true
           mkdir -p android/app/build/assets
           cp -r assets/* android/app/build/assets/ || true
-          
+
           if [ -f "assets/cart.tic" ]; then
             mkdir -p android/app/src/main/assets
             cp assets/cart.tic android/app/src/main/assets/cart.tic
+            echo "Oyun (cart.tic) varlıklara başarıyla eklendi!"
           fi
 
       - name: Build APK (Gradle)
@@ -148,11 +154,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace --info
 
-      - name: Debug Output Triage & Native Library Listing
+      # Botun tavsiye ettiği hata ayıklama adımı (Hızlı teşhis için logları listeler)
+      - name: Debug Output Triage Listing
         run: |
-          echo "=== Derlenen Derlenmiş Native (.so) Kütüphaneleri ==="
-          find . -name '*.so' -print || true
-          echo "=== Nihai Çıktı Klasör Yapısı ==="
+          echo "=== Java ve Gradle Bilgileri ==="
+          echo "JAVA_HOME=$JAVA_HOME"
+          cd android && ./gradlew --version || true
+          echo "=== Üretilen Çıktı Klasörü Klasör Ağacı ==="
           ls -R app/build/outputs || true
 
       - name: Find and Upload ANY APK
