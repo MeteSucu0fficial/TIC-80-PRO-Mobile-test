@@ -13,19 +13,19 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Force Safely Player Mode
+      - name: Fix CMake Path and Force True Player Target
         run: |
           python3 -c "
           import os, re
           content = open('android/app/build.gradle').read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. Dosya yolunu düzeltiyoruz
+          # 1. Dosya yolunu düzeltiyoruz (Kesin çalışan kısım)
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. Tamamen PLAYER odaklı argümanları ve hedefi (targets) zorluyoruz!
-          # targets \"tic80player\" diyerek Gradle'ın sadece player kütüphanesini derlemesini sağlıyoruz.
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"tic80player\"\n            }\n        }\n    }\n}\n'
+          # 2. Editörleri tamamen kapatıp yasal olan 'player-sdl' hedefini zorluyoruz!
+          # Gradle artık listede var olan 'player-sdl' hedefini derleyecek, hata vermeyecek.
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
