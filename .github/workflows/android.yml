@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Light Custom TIC Player
 on: [push]
 
 jobs:
@@ -10,72 +10,96 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Android SDK
+      - name: Setup Java & Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Prepare Assets & Inject Game (cart.tic)
+      - name: Setup NDK Toolchain Safely
         run: |
-          mkdir -p build/assets
-          mkdir -p android/app/build/assets
+          # Android'in resmi araç kiti olan ndk-build veya minimal cmake yapısını hazırlıyoruz
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 -type d | head -n 1)
+          echo "NDK_DIR=$NDK_PATH" >> $GITHUB_ENV
+
+      - name: Parse Custom Name and Package ID
+        id: parse_meta
+        run: |
+          # Varsayılan değerler
+          APP_NAME="TIC80 Custom Player"
+          PACKAGE_ID="com.nesbox.tic"
           
-          cp -r assets/* build/assets/ || true
-          cp -r assets/* android/app/build/assets/ || true
-          
-          if [ -f "assets/cart.tic" ]; then
-            mkdir -p android/app/src/main/assets
-            cp assets/cart.tic android/app/src/main/assets/cart.tic
-            echo "Game (cart.tic) embedded successfully!"
+          if [ -f "assets/name.txt" ]; then
+            APP_NAME=$(sed -n '1p' assets/name.txt | tr -d '\n\r')
+            OPT_ID=$(sed -n '2p' assets/name.txt | tr -d '\n\r')
+            if [ ! -z "$OPT_ID" ]; then
+              PACKAGE_ID="$OPT_ID"
+            fi
           fi
-
-      - name: Fix AndroidManifest Package ID
-        run: |
-          python3 -c "
-          import os, re
           
-          package_id = 'com.nesbox.tic'
-          if os.path.exists('assets/name.txt'):
-              lines = open('assets/name.txt').read().splitlines()
-              if len(lines) >= 2 and lines[1].strip():
-                  package_id = lines[1].strip()
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+          echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
+          echo "Paket Kimliği: $PACKAGE_ID | Uygulama Adı: $APP_NAME"
 
-          manifest_path = 'android/app/src/main/AndroidManifest.xml'
-          if os.path.exists(manifest_path):
-              content = open(manifest_path).read()
-              content = re.sub(r'package=\"[^\"]*\"', '', content)
-              content = content.replace('com.nesbox.tic.documents', f'{package_id}.documents')
-              content = content.replace('com.nesbox.tic.fileprovider', f'{package_id}.fileprovider')
-              open(manifest_path, 'w').write(content)
-          "
-
-      - name: Inject App Name from name.txt
+      - name: Inject Custom App Name (strings.xml)
         run: |
           STRINGS_FILE="android/app/src/main/res/values/strings.xml"
-          if [ -f "assets/name.txt" ]; then
-            APP_NAME=$(head -n 1 assets/name.txt | tr -d '\n\r')
-            sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$APP_NAME</string>|g" $STRINGS_FILE
+          if [ -f "$STRINGS_FILE" ] && [ -f "assets/name.txt" ]; then
+            sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">${{ env.APP_NAME }}</string>|g" $STRINGS_FILE
           fi
 
       - name: Inject Custom App Icon (icon.png)
         run: |
           if [ -f "assets/icon.png" ]; then
             RES_DIR="android/app/src/main/res"
+            # Eski XML ikon varyasyonlarını siliyoruz ki bizim PNG aktif olsun
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml || true
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml || true
+            
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
               mkdir -p "$RES_DIR/$dir"
               cp assets/icon.png "$RES_DIR/$dir/ic_launcher.png"
               cp assets/icon.png "$RES_DIR/$dir/ic_launcher_round.png"
             done
+            echo "Özel logo başarıyla giydirildi!"
           fi
 
-      - name: Build APK (Gradle) - Player Only
+      - name: Embed Game Cartridge (cart.tic)
+        run: |
+          # Android'in doğrudan okuyabildiği kalıcı assets klasörünü yaratıyoruz
+          mkdir -p android/app/src/main/assets
+          
+          if [ -f "assets/cart.tic" ]; then
+            cp assets/cart.tic android/app/src/main/assets/cart.tic
+            echo "Oyun kartuşu (cart.tic) APK kalbine mühürlendi!"
+          else
+            echo "UYARI: assets/cart.tic bulunamadı, boş veya varsayılan çalışacak."
+          fi
+
+      - name: Enforce Player Mode in build.gradle
+        run: |
+          python3 -c "
+          import os, re
+          gradle_path = 'android/app/build.gradle'
+          if os.path.exists(gradle_path):
+              content = open(gradle_path).read()
+              
+              # Paket ID'sini dinamik olarak güncelle
+              content = re.sub(r'applicationId\s+[\"\'].*?[\"\']', 'applicationId \"${{ env.PACKAGE_ID }}\"', content)
+              
+              # Sadece PLAYER (Oynatıcı) modunu zorla, editör hatasını tamamen baypas et
+              if 'arguments' in content:
+                  content = re.sub(r'arguments\s+.*', 'arguments \"-DBUILD_PLAYER=ON\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_PRO=OFF\", \"-DBUILD_SURF=OFF\"', content)
+              
+              open(gradle_path, 'w').write(content)
+          "
+
+      - name: Build Standalone APK
         run: |
           cd android
           chmod +x gradlew
+          # Derleme esnasında tic80.so yerine sadece player hedefini inşa edecek hafif komut
           ./gradlew assembleDebug --stacktrace
 
-      - name: Find and Upload APK
+      - name: Upload Finished Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Custom-Player-APK
-          path: '**/*.apk'
+          name: ${{ env.APP_NAME }}-Android-Build
+          path: 'android/app/build/outputs/apk/debug/*.apk'
