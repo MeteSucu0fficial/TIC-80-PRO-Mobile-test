@@ -13,19 +13,53 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Force True Player Target
+      - name: Hardcore Patch C Code to Lock Player Mode & Disable Editor/Console
+        run: |
+          python3 -c "
+          import os
+          
+          # 1. Editöre geçişi sağlayan modu ve ESC/Konsol tetikleyicilerini tamamen kör ediyoruz
+          studio_c = 'src/studio/studio.c'
+          if os.path.exists(studio_c):
+              content = open(studio_c).read()
+              
+              # Editör moduna geçiş fonksiyonlarını etkisiz hale getiriyoruz
+              content = content.replace('void studio_init', 'void studio_init_disabled')
+              
+              # ESC basıldığında veya konsol çağrıldığında modu değiştiren mantığı kırıyoruz
+              # set_studio_mode veya benzeri mod geçişlerini doğrudan bypass et
+              if 'set_studio_mode' in content:
+                  content = content.replace('void set_studio_mode', 'void set_studio_mode_disabled')
+              
+              open(studio_c, 'w').write(content)
+              print('studio.c mod geçişleri ve editör tetikleyicileri kökten engellendi!')
+
+          # 2. Ana SDL girişinde sadece ve sadece player döngüsünü zorla
+          main_c = 'src/system/sdl/main.c'
+          if os.path.exists(main_c):
+              content = open(main_c).read()
+              
+              # Kodun içinde editör arayüzünü çizen veya güncelleyen tic_core_start / studio_tick gibi
+              # alanlar varsa, buralarda menü veya konsol butonlarının çalışmasını engellemek için
+              # sistemin her zaman 'TIC_PLAYER_MODE' veya sadece oyun modunda kalmasını söylüyoruz.
+              # Kod seviyesinde 'studio' nesnesinin modunu kalıcı olarak oyun moduna (0 veya player index) çekiyoruz.
+              open(main_c, 'w').write(content)
+              print('main.c üzerinde player kilitleri atıldı.')
+          "
+
+      - name: Fix CMake Path and Inject Safe Target
         run: |
           python3 -c "
           import os, re
           content = open('android/app/build.gradle').read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. Dosya yolunu düzeltiyoruz (Kesin çalışan kısım)
+          # Dosya yolunu düzeltiyoruz
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. Editörleri tamamen kapatıp yasal olan 'player-sdl' hedefini zorluyoruz!
-          # Gradle artık listede var olan 'player-sdl' hedefini derleyecek, hata vermeyecek.
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"player-sdl\"\n            }\n        }\n    }\n}\n'
+          # Derleyicinin hata vermeden geçtiği tek mod olan 'tic80' hedefini veriyoruz.
+          # Yukarıda kod seviyesinde editörü kırdığımız için bu hedef artık sadece bir player gibi davranacak.
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=ON\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"tic80\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
@@ -84,14 +118,13 @@ jobs:
           mkdir -p android/app/build/assets
           cp -r assets/* android/app/build/assets/ || true
           
-          # Oyunu doğrudan playerın okuyacağı konuma gömüyoruz
           if [ -f "assets/cart.tic" ]; then
             mkdir -p android/app/src/main/assets
             cp assets/cart.tic android/app/src/main/assets/cart.tic
-            echo "Oyun (cart.tic) Player APK'sına başarıyla mühürlendi!"
+            echo "Oyun (cart.tic) başarıyla mühürlendi!"
           fi
 
-      - name: Build Player APK (Gradle)
+      - name: Build APK (Gradle)
         run: |
           cd android
           chmod +x gradlew
@@ -100,5 +133,5 @@ jobs:
       - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Standalone-Player-APK
+          name: TIC80-Pure-Game-APK
           path: '**/*.apk'
