@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android Player APK
 on: [push]
 
 jobs:
@@ -13,22 +13,23 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix CMake Path and Inject Flags Safely
+      - name: Fix CMake Path and Force Safely Player Mode
         run: |
           python3 -c "
           import os, re
           content = open('android/app/build.gradle').read()
           workspace = os.environ.get('GITHUB_WORKSPACE', '')
           
-          # 1. Sadece dosya yolunu düzeltiyoruz (Senin kesin çalışan orijinal kısmın)
+          # 1. Dosya yolunu düzeltiyoruz
           content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
           
-          # 2. Orijinal başarılı argümanları aynen koruyoruz (Böylece hata asla çıkmıyor)
-          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=ON\", \"-DBUILD_EDITORS=ON\", \"-DBUILD_SURF=ON\", \"-DBUILD_PLAYER=OFF\", \"-DBUILD_WITH_JANET=OFF\"\n            }\n        }\n    }\n}\n'
+          # 2. Tamamen PLAYER odaklı argümanları ve hedefi (targets) zorluyoruz!
+          # targets \"tic80player\" diyerek Gradle'ın sadece player kütüphanesini derlemesini sağlıyoruz.
+          content += '\n\nandroid {\n    defaultConfig {\n        externalNativeBuild {\n            cmake {\n                arguments \"-DBUILD_PRO=OFF\", \"-DBUILD_EDITORS=OFF\", \"-DBUILD_SURF=OFF\", \"-DBUILD_PLAYER=ON\", \"-DBUILD_WITH_JANET=OFF\"\n                targets \"tic80player\"\n            }\n        }\n    }\n}\n'
           
           open('android/app/build.gradle', 'w').write(content)
           "
-          echo "---- Dosyanın Son Hali (Kontrol) ----"
+          echo "---- build.gradle Son Satırları ----"
           tail -n 15 android/app/build.gradle
 
       - name: Dynamic Name & Package ID Injection from assets/name.txt
@@ -36,9 +37,8 @@ jobs:
           python3 -c "
           import os, re
           
-          # Varsayılan Paket ID'si
           package_id = 'com.nesbox.tic'
-          app_name = 'TIC-80 Pro'
+          app_name = 'TIC-80 Player'
           
           if os.path.exists('assets/name.txt'):
               lines = open('assets/name.txt').read().splitlines()
@@ -47,7 +47,7 @@ jobs:
               if len(lines) >= 2 and lines[1].strip():
                   package_id = lines[1].strip()
 
-          # 1. Manifest dosyasındaki Package ID'leri güncelle
+          # Manifest güncellemeleri
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               content = open(manifest_path).read()
@@ -56,21 +56,18 @@ jobs:
               content = content.replace('com.nesbox.tic.fileprovider', f'{package_id}.fileprovider')
               open(manifest_path, 'w').write(content)
 
-          # 2. strings.xml içindeki uygulama ismini değiştir
+          # strings.xml (Uygulama ismi)
           strings_path = 'android/app/src/main/res/values/strings.xml'
           if os.path.exists(strings_path):
               content = open(strings_path).read()
               content = re.sub(r'<string name=\"app_name\">.*?</string>', f'<string name=\"app_name\">{app_name}</string>', content)
               open(strings_path, 'w').write(content)
-              
-          print(f'Uygulama Adı: {app_name} | Paket ID: {package_id} olarak ayarlandı.')
           "
 
       - name: Inject Custom App Icon (icon.png)
         run: |
           if [ -f "assets/icon.png" ]; then
             RES_DIR="android/app/src/main/res"
-            # Varsa eski vektörel xml ikonları temizle ki bizim PNG ezilmesin
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher.xml || true
             rm -f $RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml || true
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
@@ -78,25 +75,23 @@ jobs:
               cp assets/icon.png "$RES_DIR/$dir/ic_launcher.png"
               cp assets/icon.png "$RES_DIR/$dir/ic_launcher_round.png"
             done
-            echo "Özel logo projenin içine yerleştirildi!"
           fi
 
       - name: Prepare Assets & Embed Game (cart.tic)
         run: |
-          # Orijinal kopyalama adımları
           mkdir -p build/assets
           cp -r assets/* build/assets/ || true
           mkdir -p android/app/build/assets
           cp -r assets/* android/app/build/assets/ || true
           
-          # KESİN ÇÖZÜM: cart.tic dosyasını doğrudan Android'in ana assets dizinine koyuyoruz
+          # Oyunu doğrudan playerın okuyacağı konuma gömüyoruz
           if [ -f "assets/cart.tic" ]; then
             mkdir -p android/app/src/main/assets
             cp assets/cart.tic android/app/src/main/assets/cart.tic
-            echo "Oyun (cart.tic) APK kök dizinine gömüldü!"
+            echo "Oyun (cart.tic) Player APK'sına başarıyla mühürlendi!"
           fi
 
-      - name: Build APK (Gradle)
+      - name: Build Player APK (Gradle)
         run: |
           cd android
           chmod +x gradlew
@@ -105,5 +100,5 @@ jobs:
       - name: Find and Upload ANY APK
         uses: actions/upload-artifact@v4
         with:
-          name: TIC80-Custom-Game-APK
+          name: TIC80-Standalone-Player-APK
           path: '**/*.apk'
