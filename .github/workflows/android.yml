@@ -19,7 +19,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Botun önerdiği akıllı sdkmanager tespiti ve hatasız kurulum adımı
       - name: Install Android SDK components & accept licenses
         run: |
           export ANDROID_SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
@@ -43,11 +42,10 @@ jobs:
               content = open(path, 'r', encoding='utf-8').read()
               if fix_block not in content:
                   open(path, 'w', encoding='utf-8').write(content + fix_block)
-                  print('CMake yolu güvenli bir şekilde eklendi.')
           "
 
-      # Dosyanın sonuna eklemek yerine mevcut 'android {' bloğunun içine sızan akıllı Gradle enjektörü
-      - name: Inject Safe Gradle Targets (Smart In-Place Merge)
+      # Sıfırdan blok eklemek yerine, mevcut defaultConfig içindeki cmake alanını nokta atışı günceller
+      - name: Curgical Modification of build.gradle Arguments
         run: |
           python3 -c "
           import os, re
@@ -56,27 +54,30 @@ jobs:
               content = open(path, 'r', encoding='utf-8').read()
               workspace = os.environ.get('GITHUB_WORKSPACE', '').replace('\\', '/')
               
-              # Orijinal CMake yolunu güncelliyoruz
+              # 1. CMakeLists.txt yolunu güncelle
               content = re.sub(r'path\s+[\'\"].*?CMakeLists\.txt[\'\"]', f'path \"{workspace}/CMakeLists.txt\"', content)
               
-              # Eğer daha önce eklenmediyse, mevcut 'android {' ifadesini bulup hemen içine gömüyoruz
-              if \"targets 'tic80'\" not in content and 'targets \"tic80\"' not in content:
-                  target_block = '''
-      defaultConfig {
-          externalNativeBuild {
-              cmake {
-                  arguments '-DBUILD_PRO=OFF', '-DBUILD_EDITORS=OFF', '-DBUILD_SURF=OFF', '-DBUILD_PLAYER=ON', '-DBUILD_WITH_JANET=OFF'
-                  targets 'tic80'
-              }
-          }
-      }
-  '''
-                  # 'android {' satırından hemen sonrasına enjekte ederek Gradle yapısını bozmuyoruz
-                  content = content.replace('android {', f'android {{\n{target_block}')
+              # 2. Mevcut externalNativeBuild -> cmake bloğunu bulup argümanları ve hedefi güvenle ezer
+              # Parantez yapısını asla bozmaz, sadece içerideki metni değiştirir
+              if 'targets' not in content or 'tic80' not in content:
+                  # Mevcut cmake { ... } bloğunu yakalamaya çalışıyoruz veya defaultConfig altına temizce yerleştiriyoruz
+                  cmake_replacement = '''cmake {
+                      arguments '-DBUILD_PRO=OFF', '-DBUILD_EDITORS=OFF', '-DBUILD_SURF=OFF', '-DBUILD_PLAYER=ON', '-DBUILD_WITH_JANET=OFF'
+                      targets 'tic80'
+                  }'''
+                  
+                  # Eğer dosyada zaten bir 'cmake {' tanımı varsa onu bu temiz versiyonla değiştiriyoruz
+                  if 'cmake {' in content:
+                      # İlk eşleşen genel tanımlamayı değiştirmek için
+                      content = re.sub(r'cmake\s*\{[^}]*\}', cmake_replacement, content, count=1)
+                  else:
+                      # Yoksa defaultConfig altına ekle
+                      content = content.replace('defaultConfig {', f'defaultConfig {{\n        externalNativeBuild {{\n            {cmake_replacement}\n        }}')
+                  
                   open(path, 'w', encoding='utf-8').write(content)
-                  print('Gradle argümanları orijinal android bloğunun içine başarıyla gömüldü.')
+                  print('build.gradle cerrahi müdahaleyle güncellendi.')
               else:
-                  print('Gradle argümanları zaten mevcut, işlem atlandı.')
+                  print('Ayarlar zaten mevcut görünüyor.')
           "
 
       - name: Advanced Manifest & Strings Injection (ElementTree)
@@ -139,7 +140,6 @@ jobs:
           if [ -f "assets/cart.tic" ]; then
             mkdir -p android/app/src/main/assets
             cp assets/cart.tic android/app/src/main/assets/cart.tic
-            echo "Oyun (cart.tic) varlıklara başarıyla eklendi!"
           fi
 
       - name: Build APK (Gradle)
@@ -148,12 +148,8 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace --info
 
-      # Botun ısrarla istediği derinlemesine hata ayıklama ve çıktı doğrulama listesi
       - name: Debug Output Triage & Native Library Listing
         run: |
-          echo "=== Java ve Gradle Durumu ==="
-          echo "JAVA_HOME=$JAVA_HOME"
-          cd android && ./gradlew --version || true
           echo "=== Derlenen Derlenmiş Native (.so) Kütüphaneleri ==="
           find . -name '*.so' -print || true
           echo "=== Nihai Çıktı Klasör Yapısı ==="
